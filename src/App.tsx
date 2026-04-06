@@ -2,12 +2,13 @@ function App() {
   return (
     <div style={{ padding: "40px", fontFamily: "Arial", background: "#f5f7fb", minHeight: "100vh" }}>
       
-      {/* Header */}
+      {/* TEST HEADER */}
       <h1 style={{ fontSize: "32px", marginBottom: "10px" }}>
-        PonProp Dashboard
+        PonProp Workflow Test 123
       </h1>
+
       <p style={{ marginBottom: "30px", color: "#555" }}>
-        Property Management System
+        If you see this on your live site, your full workflow is working.
       </p>
 
       {/* Stats Row */}
