@@ -208,71 +208,26 @@ export default function App() {
   }
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "#f3f4f6",
-        fontFamily: 'Inter, Arial, "Helvetica Neue", sans-serif',
-        color: "#0f172a",
-        padding: "4px",
-        boxSizing: "border-box",
-      }}
-    >
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "320px 1fr",
-          height: "calc(100vh - 8px)",
-          borderRadius: "18px",
-          overflow: "hidden",
-          border: "1px solid #d9dde5",
-          background: "#ffffff",
-        }}
-      >
-        <aside
-          style={{
-            background: "#f8fafc",
-            borderRight: "1px solid #dde3eb",
-            display: "flex",
-            flexDirection: "column",
-            minHeight: "100%",
-          }}
-        >
-          <div
-            style={{
-              padding: "20px 16px 18px 16px",
-              display: "flex",
-              alignItems: "center",
-              gap: "14px",
-              borderBottom: "1px solid #e5e7eb",
-              background: "#ffffff",
-            }}
-          >
-            <div
-              style={{
-                width: "42px",
-                height: "42px",
-                borderRadius: "14px",
-                background: "#2563eb",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "#ffffff",
-                fontSize: "22px",
-                fontWeight: 700,
-              }}
-            >
+    <div className="min-h-screen bg-slate-100 text-slate-900 p-1 box-border">
+      <div className="grid min-h-[calc(100vh-8px)] grid-cols-1 lg:grid-cols-[320px_1fr] rounded-[18px] overflow-hidden border border-slate-200 bg-white">
+
+        <aside className="flex flex-col bg-slate-50 border-b border-slate-200 lg:border-b-0 lg:border-r lg:bg-slate-50 h-full">
+          <div className="flex items-center gap-4 border-b border-slate-200 bg-white px-5 py-5">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-700 text-white text-xl font-bold">
               ▤
             </div>
-            <div style={{ fontSize: "18px", fontWeight: 700 }}>Pongratz Properties</div>
+            <div>
+              <div className="text-base font-semibold text-slate-900">Pongratz Properties</div>
+            </div>
           </div>
 
-          <div style={{ overflowY: "auto", padding: "14px 10px 20px 10px", flex: 1 }}>
+          <div className="flex-1 overflow-y-auto px-3 py-4">
             {sidebarItems.map((item) => {
               const isActive = item === activeModule;
               return (
-                <div
+                <button
                   key={item}
+                  type="button"
                   onClick={() => {
                     if (
                       item === "Home" ||
@@ -284,148 +239,58 @@ export default function App() {
                       setActiveModule(item as ModuleKey);
                     }
                   }}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "14px",
-                    padding: "12px 14px",
-                    borderRadius: "16px",
-                    marginBottom: "4px",
-                    background: isActive ? "#dfe7f5" : "transparent",
-                    color: isActive ? "#2563eb" : "#0f172a",
-                    fontWeight: isActive ? 700 : 500,
-                    fontSize: "16px",
-                    cursor: "pointer",
-                  }}
+                  className={`flex w-full items-center gap-4 rounded-2xl px-4 py-3 mb-1 text-left text-sm font-medium transition duration-200 ${
+                    isActive ? "bg-slate-200 text-sky-700" : "text-slate-700 hover:bg-slate-100"
+                  }`}
+                  style={{ cursor: "pointer", border: "none" }}
                 >
                   <span style={{ width: "18px", textAlign: "center", fontSize: "18px" }}>
                     {getSidebarIcon(item)}
                   </span>
                   <span>{item}</span>
-                </div>
+                </button>
               );
             })}
           </div>
         </aside>
 
-        <main
-          style={{
-            background: "#f3f4f6",
-            display: "flex",
-            flexDirection: "column",
-            minWidth: 0,
-          }}
-        >
-          <div
-            style={{
-              height: "68px",
-              background: "#f8fafc",
-              borderBottom: "1px solid #dde3eb",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "0 18px 0 20px",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-              <div style={{ fontSize: "22px", color: "#475569" }}>◫</div>
-              <div style={{ fontSize: "22px", fontWeight: 700, color: "#111827" }}>
-                Pongratz Properties
-              </div>
+        <main className="flex min-w-0 flex-col bg-slate-100 h-full">
+          <div className="flex h-16 items-center justify-between gap-5 border-b border-slate-200 bg-slate-50 px-5">
+            <div className="flex items-center gap-4 text-slate-800">
+              <div className="text-2xl">◫</div>
+              <div className="text-xl font-semibold">Pongratz Properties</div>
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: "18px" }}>
-              <div
-                style={{
-                  width: "320px",
-                  maxWidth: "32vw",
-                  background: "#f3f4f6",
-                  border: "1px solid #e5e7eb",
-                  borderRadius: "999px",
-                  padding: "12px 16px",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "10px",
-                  color: "#6b7280",
-                  fontSize: "16px",
-                }}
-              >
-                <span style={{ fontSize: "18px" }}>⌕</span>
+            <div className="flex items-center gap-4">
+              <div className="flex w-[320px] max-w-[32vw] items-center gap-3 rounded-full border border-slate-200 bg-slate-100 px-4 py-3 text-sm text-slate-500">
+                <span className="text-base">⌕</span>
                 <span>Search...</span>
               </div>
-
-              <div style={{ position: "relative", fontSize: "22px", color: "#475569" }}>
+              <div className="relative text-2xl text-slate-600">
                 ⍾
-                <span
-                  style={{
-                    position: "absolute",
-                    top: "0px",
-                    right: "-1px",
-                    width: "9px",
-                    height: "9px",
-                    borderRadius: "50%",
-                    background: "#2563eb",
-                    border: "2px solid #f8fafc",
-                  }}
-                />
+                <span className="absolute -right-1 top-0 h-2.5 w-2.5 rounded-full bg-sky-700 ring-2 ring-slate-50" />
               </div>
-
-              <div
-                style={{
-                  width: "40px",
-                  height: "40px",
-                  borderRadius: "999px",
-                  background: "#dbe7ff",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "#2563eb",
-                  fontWeight: 700,
-                  fontSize: "18px",
-                }}
-              >
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-sky-100 text-sky-700 font-semibold">
                 PP
               </div>
             </div>
           </div>
 
-          <div style={{ padding: "28px", overflowY: "auto", flex: 1 }}>
+          <div className="flex-1 overflow-y-auto p-7">
             {loading && <div style={{ marginBottom: "16px" }}>Loading...</div>}
 
             {activeModule === "Home" && (
               <>
-                <div
-                  style={{
-                    fontSize: "54px",
-                    fontWeight: 800,
-                    color: "#0b1b4d",
-                    lineHeight: 1.05,
-                    marginBottom: "8px",
-                  }}
-                >
-                  Welcome back <span style={{ fontSize: "42px" }}>👋</span>
+                <div className="text-5xl font-extrabold tracking-tight text-slate-900 sm:text-6xl mb-3">
+                  Welcome back <span className="text-4xl">👋</span>
                 </div>
+                <div className="text-lg text-slate-600 mb-9">Manage your properties from one place.</div>
 
-                <div
-                  style={{
-                    fontSize: "24px",
-                    color: "#64748b",
-                    marginBottom: "34px",
-                  }}
-                >
-                  Manage your properties from one place.
-                </div>
-
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(6, minmax(150px, 1fr))",
-                    gap: "20px",
-                  }}
-                >
+                <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
                   {appItems.map((item) => (
-                    <div
+                    <button
                       key={item.name}
+                      type="button"
                       onClick={() => {
                         if (
                           item.name === "Home" ||
@@ -437,17 +302,12 @@ export default function App() {
                           setActiveModule(item.name as ModuleKey);
                         }
                       }}
+                      className="group rounded-[22px] border border-slate-200 bg-slate-50 min-h-[154px] p-0 text-center transition duration-200 hover:-translate-y-1 hover:shadow-lg"
                       style={{
-                        background: "#f8fafc",
-                        border: "1px solid #e5e7eb",
-                        borderRadius: "22px",
-                        minHeight: "154px",
                         display: "flex",
                         flexDirection: "column",
                         alignItems: "center",
                         justifyContent: "center",
-                        boxShadow: "0 1px 0 rgba(15,23,42,0.02)",
-                        cursor: "pointer",
                       }}
                     >
                       <div
@@ -479,7 +339,7 @@ export default function App() {
                       >
                         {item.name}
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </>
@@ -487,62 +347,60 @@ export default function App() {
 
             {activeModule === "Properties" && (
               <>
-                <h1 style={{ marginTop: 0, marginBottom: "18px" }}>Properties</h1>
+                <h1 className="text-2xl font-semibold text-slate-900 mb-4">Properties</h1>
 
-                <div style={panelStyle}>
-                  <h3>Add Property</h3>
-                  <div style={formGrid}>
+                <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm mb-8">
+                  <h3 className="text-lg font-semibold text-slate-900 mb-4">Add Property</h3>
+                  <div className="grid gap-3 mb-3.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
                     <input
-                      style={inputStyle}
+                      className="px-3.5 py-3 rounded-3xl border border-slate-200 bg-white"
                       placeholder="Property Name"
                       value={newProperty.name}
                       onChange={(e) => setNewProperty({ ...newProperty, name: e.target.value })}
                     />
                     <input
-                      style={inputStyle}
+                      className="px-3.5 py-3 rounded-3xl border border-slate-200 bg-white"
                       placeholder="Address"
                       value={newProperty.address}
                       onChange={(e) => setNewProperty({ ...newProperty, address: e.target.value })}
                     />
                     <input
-                      style={inputStyle}
+                      className="px-3.5 py-3 rounded-3xl border border-slate-200 bg-white"
                       type="number"
                       placeholder="Units"
                       value={newProperty.units}
-                      onChange={(e) =>
-                        setNewProperty({ ...newProperty, units: Number(e.target.value) })
-                      }
+                      onChange={(e) => setNewProperty({ ...newProperty, units: Number(e.target.value) })}
                     />
                     <input
-                      style={inputStyle}
+                      className="px-3.5 py-3 rounded-3xl border border-slate-200 bg-white"
                       placeholder="Status"
                       value={newProperty.status}
                       onChange={(e) => setNewProperty({ ...newProperty, status: e.target.value })}
                     />
                   </div>
-                  <button style={buttonStyle} onClick={addProperty}>
+                  <button className="px-4 py-3 rounded-3xl bg-sky-600 text-white font-semibold hover:bg-sky-700 transition" onClick={addProperty}>
                     Save Property
                   </button>
                 </div>
 
-                <div style={panelStyle}>
-                  <h3>Property List</h3>
-                  <table style={tableStyle}>
+                <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                  <h3 className="text-lg font-semibold text-slate-900 mb-4">Property List</h3>
+                  <table className="min-w-full border-collapse">
                     <thead>
-                      <tr>
-                        <th style={thStyle}>Name</th>
-                        <th style={thStyle}>Address</th>
-                        <th style={thStyle}>Units</th>
-                        <th style={thStyle}>Status</th>
+                      <tr className="text-left text-sm text-slate-600">
+                        <th className="pb-3 pr-6">Name</th>
+                        <th className="pb-3 pr-6">Address</th>
+                        <th className="pb-3 pr-6">Units</th>
+                        <th className="pb-3">Status</th>
                       </tr>
                     </thead>
                     <tbody>
                       {properties.map((property) => (
-                        <tr key={property.id}>
-                          <td style={tdStyle}>{property.name}</td>
-                          <td style={tdStyle}>{property.address}</td>
-                          <td style={tdStyle}>{property.units}</td>
-                          <td style={tdStyle}>{property.status}</td>
+                        <tr key={property.id} className="border-t border-slate-200">
+                          <td className="py-4 pr-6 text-sm text-slate-700">{property.name}</td>
+                          <td className="py-4 pr-6 text-sm text-slate-700">{property.address}</td>
+                          <td className="py-4 pr-6 text-sm text-slate-700">{property.units}</td>
+                          <td className="py-4 text-sm text-slate-700">{property.status}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -553,25 +411,25 @@ export default function App() {
 
             {activeModule === "Tenants" && (
               <>
-                <h1 style={{ marginTop: 0, marginBottom: "18px" }}>Tenants</h1>
+                <h1 className="text-2xl font-semibold text-slate-900 mb-4">Tenants</h1>
 
-                <div style={panelStyle}>
-                  <h3>Add Tenant</h3>
-                  <div style={formGrid}>
+                <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm mb-8">
+                  <h3 className="text-lg font-semibold text-slate-900 mb-4">Add Tenant</h3>
+                  <div className="grid gap-3 mb-3.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
                     <input
-                      style={inputStyle}
+                      className="px-3.5 py-3 rounded-3xl border border-slate-200 bg-white"
                       placeholder="Tenant Name"
                       value={newTenant.name}
                       onChange={(e) => setNewTenant({ ...newTenant, name: e.target.value })}
                     />
                     <input
-                      style={inputStyle}
+                      className="px-3.5 py-3 rounded-3xl border border-slate-200 bg-white"
                       placeholder="Unit"
                       value={newTenant.unit}
                       onChange={(e) => setNewTenant({ ...newTenant, unit: e.target.value })}
                     />
                     <input
-                      style={inputStyle}
+                      className="px-3.5 py-3 rounded-3xl border border-slate-200 bg-white"
                       type="number"
                       placeholder="Rent"
                       value={newTenant.rent}
@@ -580,35 +438,35 @@ export default function App() {
                       }
                     />
                     <input
-                      style={inputStyle}
+                      className="px-3.5 py-3 rounded-3xl border border-slate-200 bg-white"
                       placeholder="Status"
                       value={newTenant.status}
                       onChange={(e) => setNewTenant({ ...newTenant, status: e.target.value })}
                     />
                   </div>
-                  <button style={buttonStyle} onClick={addTenant}>
+                  <button className="px-4 py-3 rounded-3xl bg-sky-600 text-white font-semibold hover:bg-sky-700 transition" onClick={addTenant}>
                     Save Tenant
                   </button>
                 </div>
 
-                <div style={panelStyle}>
-                  <h3>Tenant List</h3>
-                  <table style={tableStyle}>
+                <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                  <h3 className="text-lg font-semibold text-slate-900 mb-4">Tenant List</h3>
+                  <table className="min-w-full border-collapse">
                     <thead>
-                      <tr>
-                        <th style={thStyle}>Name</th>
-                        <th style={thStyle}>Unit</th>
-                        <th style={thStyle}>Rent</th>
-                        <th style={thStyle}>Status</th>
+                      <tr className="text-left text-sm text-slate-600">
+                        <th className="pb-3 pr-6">Name</th>
+                        <th className="pb-3 pr-6">Unit</th>
+                        <th className="pb-3 pr-6">Rent</th>
+                        <th className="pb-3">Status</th>
                       </tr>
                     </thead>
                     <tbody>
                       {tenants.map((tenant) => (
-                        <tr key={tenant.id}>
-                          <td style={tdStyle}>{tenant.name}</td>
-                          <td style={tdStyle}>{tenant.unit}</td>
-                          <td style={tdStyle}>${tenant.rent}</td>
-                          <td style={tdStyle}>{tenant.status}</td>
+                        <tr key={tenant.id} className="border-t border-slate-200">
+                          <td className="py-4 pr-6 text-sm text-slate-700">{tenant.name}</td>
+                          <td className="py-4 pr-6 text-sm text-slate-700">{tenant.unit}</td>
+                          <td className="py-4 pr-6 text-sm text-slate-700">${tenant.rent}</td>
+                          <td className="py-4 text-sm text-slate-700">{tenant.status}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -619,53 +477,42 @@ export default function App() {
 
             {activeModule === "Accounting" && (
               <>
-                <h1 style={{ marginTop: 0, marginBottom: "18px" }}>Accounting</h1>
+                <h1 className="text-2xl font-semibold text-slate-900 mb-4">Accounting</h1>
 
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(3, minmax(220px, 1fr))",
-                    gap: "18px",
-                    marginBottom: "22px",
-                  }}
-                >
-                  <div style={metricCardStyle}>
-                    <div style={metricLabel}>Income</div>
-                    <div style={metricValue}>${totalIncome.toLocaleString()}</div>
+                <div className="grid gap-5 md:grid-cols-3 mb-8">
+                  <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <div className="text-sm text-slate-500 mb-2">Income</div>
+                    <div className="text-3xl font-extrabold text-slate-900">${totalIncome.toLocaleString()}</div>
                   </div>
-                  <div style={metricCardStyle}>
-                    <div style={metricLabel}>Expenses</div>
-                    <div style={metricValue}>${totalExpenses.toLocaleString()}</div>
+                  <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <div className="text-sm text-slate-500 mb-2">Expenses</div>
+                    <div className="text-3xl font-extrabold text-slate-900">${totalExpenses.toLocaleString()}</div>
                   </div>
-                  <div style={metricCardStyle}>
-                    <div style={metricLabel}>Net Profit</div>
-                    <div style={{ ...metricValue, color: netProfit >= 0 ? "#16a34a" : "#dc2626" }}>
+                  <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <div className="text-sm text-slate-500 mb-2">Net Profit</div>
+                    <div className={`text-3xl font-extrabold ${netProfit >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
                       ${netProfit.toLocaleString()}
                     </div>
                   </div>
                 </div>
 
-                <div style={panelStyle}>
-                  <h3>Add Transaction</h3>
-                  <div style={formGrid}>
+                <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm mb-8">
+                  <h3 className="text-lg font-semibold text-slate-900 mb-4">Add Transaction</h3>
+                  <div className="grid gap-3 mb-3.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
                     <input
-                      style={inputStyle}
+                      className="px-3.5 py-3 rounded-3xl border border-slate-200 bg-white"
                       type="date"
                       value={newTransaction.date}
-                      onChange={(e) =>
-                        setNewTransaction({ ...newTransaction, date: e.target.value })
-                      }
+                      onChange={(e) => setNewTransaction({ ...newTransaction, date: e.target.value })}
                     />
                     <input
-                      style={inputStyle}
+                      className="px-3.5 py-3 rounded-3xl border border-slate-200 bg-white"
                       placeholder="Description"
                       value={newTransaction.description}
-                      onChange={(e) =>
-                        setNewTransaction({ ...newTransaction, description: e.target.value })
-                      }
+                      onChange={(e) => setNewTransaction({ ...newTransaction, description: e.target.value })}
                     />
                     <select
-                      style={inputStyle}
+                      className="px-3.5 py-3 rounded-3xl border border-slate-200 bg-white"
                       value={newTransaction.type}
                       onChange={(e) =>
                         setNewTransaction({
@@ -678,7 +525,7 @@ export default function App() {
                       <option value="expense">Expense</option>
                     </select>
                     <input
-                      style={inputStyle}
+                      className="px-3.5 py-3 rounded-3xl border border-slate-200 bg-white"
                       type="number"
                       placeholder="Amount"
                       value={newTransaction.amount}
@@ -690,39 +537,37 @@ export default function App() {
                       }
                     />
                     <input
-                      style={inputStyle}
+                      className="px-3.5 py-3 rounded-3xl border border-slate-200 bg-white"
                       placeholder="Category"
                       value={newTransaction.category}
-                      onChange={(e) =>
-                        setNewTransaction({ ...newTransaction, category: e.target.value })
-                      }
+                      onChange={(e) => setNewTransaction({ ...newTransaction, category: e.target.value })}
                     />
                   </div>
-                  <button style={buttonStyle} onClick={addTransaction}>
+                  <button className="px-4 py-3 rounded-3xl bg-sky-600 text-white font-semibold hover:bg-sky-700 transition" onClick={addTransaction}>
                     Save Transaction
                   </button>
                 </div>
 
-                <div style={panelStyle}>
-                  <h3>Transactions</h3>
-                  <table style={tableStyle}>
+                <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                  <h3 className="text-lg font-semibold text-slate-900 mb-4">Transactions</h3>
+                  <table className="min-w-full border-collapse">
                     <thead>
-                      <tr>
-                        <th style={thStyle}>Date</th>
-                        <th style={thStyle}>Description</th>
-                        <th style={thStyle}>Type</th>
-                        <th style={thStyle}>Category</th>
-                        <th style={thStyle}>Amount</th>
+                      <tr className="text-left text-sm text-slate-600">
+                        <th className="pb-3 pr-6">Date</th>
+                        <th className="pb-3 pr-6">Description</th>
+                        <th className="pb-3 pr-6">Type</th>
+                        <th className="pb-3 pr-6">Category</th>
+                        <th className="pb-3">Amount</th>
                       </tr>
                     </thead>
                     <tbody>
                       {transactions.map((transaction) => (
-                        <tr key={transaction.id}>
-                          <td style={tdStyle}>{transaction.date}</td>
-                          <td style={tdStyle}>{transaction.description}</td>
-                          <td style={tdStyle}>{transaction.type}</td>
-                          <td style={tdStyle}>{transaction.category}</td>
-                          <td style={tdStyle}>${transaction.amount}</td>
+                        <tr key={transaction.id} className="border-t border-slate-200">
+                          <td className="py-4 pr-6 text-sm text-slate-700">{transaction.date}</td>
+                          <td className="py-4 pr-6 text-sm text-slate-700">{transaction.description}</td>
+                          <td className="py-4 pr-6 text-sm text-slate-700">{transaction.type}</td>
+                          <td className="py-4 pr-6 text-sm text-slate-700">{transaction.category}</td>
+                          <td className="py-4 text-sm text-slate-700">${transaction.amount}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -733,10 +578,10 @@ export default function App() {
 
             {activeModule === "Reports" && (
               <>
-                <h1 style={{ marginTop: 0, marginBottom: "18px" }}>Reports</h1>
-                <div style={panelStyle}>
-                  <h3>Portfolio Summary</h3>
-                  <div style={{ lineHeight: 1.9, color: "#334155" }}>
+                <h1 className="text-2xl font-semibold text-slate-900 mb-4">Reports</h1>
+                <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                  <h3 className="text-lg font-semibold text-slate-900 mb-4">Portfolio Summary</h3>
+                  <div className="space-y-3 leading-7 text-slate-700">
                     <div>Total Properties: {properties.length}</div>
                     <div>Total Tenants: {tenants.length}</div>
                     <div>Total Income: ${totalIncome.toLocaleString()}</div>
@@ -795,74 +640,3 @@ function getSidebarIcon(item: string) {
       return "•";
   }
 }
-
-const panelStyle: React.CSSProperties = {
-  background: "#ffffff",
-  borderRadius: "18px",
-  border: "1px solid #e5e7eb",
-  padding: "20px",
-  marginBottom: "20px",
-};
-
-const formGrid: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-  gap: "12px",
-  marginBottom: "14px",
-};
-
-const inputStyle: React.CSSProperties = {
-  padding: "12px 14px",
-  borderRadius: "12px",
-  border: "1px solid #d1d5db",
-  fontSize: "14px",
-  background: "#ffffff",
-};
-
-const buttonStyle: React.CSSProperties = {
-  padding: "12px 16px",
-  borderRadius: "12px",
-  border: "none",
-  background: "#2563eb",
-  color: "#ffffff",
-  fontWeight: 700,
-  cursor: "pointer",
-};
-
-const tableStyle: React.CSSProperties = {
-  width: "100%",
-  borderCollapse: "collapse",
-};
-
-const thStyle: React.CSSProperties = {
-  textAlign: "left",
-  padding: "12px",
-  borderBottom: "1px solid #e5e7eb",
-  fontSize: "14px",
-  color: "#475569",
-};
-
-const tdStyle: React.CSSProperties = {
-  padding: "12px",
-  borderBottom: "1px solid #f1f5f9",
-  fontSize: "14px",
-};
-
-const metricCardStyle: React.CSSProperties = {
-  background: "#ffffff",
-  borderRadius: "18px",
-  border: "1px solid #e5e7eb",
-  padding: "20px",
-};
-
-const metricLabel: React.CSSProperties = {
-  fontSize: "14px",
-  color: "#64748b",
-  marginBottom: "8px",
-};
-
-const metricValue: React.CSSProperties = {
-  fontSize: "32px",
-  fontWeight: 800,
-  color: "#0f172a",
-};
