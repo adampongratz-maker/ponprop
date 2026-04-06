@@ -65,26 +65,42 @@ const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
     return null;
   }
 
-  return (
-    <style
-      dangerouslySetInnerHTML={{
-        __html: Object.entries(THEMES)
-          .map(
-            ([theme, prefix]) => `
-${prefix} [data-chart=${id}] {
-${colorConfig
-  .map(([key, itemConfig]) => {
-    const color = itemConfig.theme?.[theme as keyof typeof itemConfig.theme] || itemConfig.color;
-    return color ? `  --color-${key}: ${color};` : null;
-  })
-  .join("\n")}
-}
-`,
-          )
-          .join("\n"),
-      }}
-    />
-  );
+  // Validate color values to avoid injecting arbitrary HTML/CSS.
+  function sanitizeColor(value: unknown): string | null {
+    if (typeof value !== "string") return null;
+    const v = value.trim();
+    // hex (#fff or #ffffff)
+    if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(v)) return v;
+    // rgb(...) or rgba(...)
+    if (/^rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}(?:\s*,\s*(0|1|0?\.\d+))?\s*\)$/.test(v)) return v;
+    // CSS variable reference
+    if (/^var\(--[a-z0-9_-]+\)$/i.test(v)) return v;
+    // simple color names (e.g., 'red', 'blue')
+    if (/^[a-zA-Z]+$/.test(v)) return v;
+    return null;
+  }
+
+  const css = Object.entries(THEMES)
+    .map(([theme, prefix]) => {
+      const body = colorConfig
+        .map(([key, itemConfig]) => {
+          const raw = itemConfig.theme?.[theme as keyof typeof itemConfig.theme] || itemConfig.color;
+          const color = sanitizeColor(raw);
+          return color ? `  --color-${key}: ${color};` : null;
+        })
+        .filter(Boolean)
+        .join("\n");
+
+      if (!body) return null;
+
+      return `${prefix} [data-chart=${id}] {\n${body}\n}`;
+    })
+    .filter(Boolean)
+    .join("\n");
+
+  if (!css) return null;
+
+  return <style dangerouslySetInnerHTML={{ __html: css }} />;
 };
 
 const ChartTooltip = RechartsPrimitive.Tooltip;

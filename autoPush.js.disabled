@@ -1,0 +1,12 @@
+// WARNING: This file has been disabled because it auto-commits and pushes
+// changes every 10 seconds, which can leak secrets and cause broken commits.
+// If you need automated pushes, use a CI/CD pipeline or a guarded script.
+// Original contents (kept for reference):
+// const { exec } = require("child_process");
+//
+// setInterval(() => {
+//   exec("git add . && git commit -m \"auto update\" && git push", (err) => {
+//     if (err) return;
+//     console.log("Auto pushed");
+//   });
+// }, 10000); // every 10 seconds
