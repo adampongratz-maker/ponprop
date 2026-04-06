@@ -1,5 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
 import { supabase } from "./lib/supabase";
+import AuthPage from "./pages/AuthPage";
+import Privacy from "./pages/Privacy";
 
 type ModuleKey =
   | "Home"
@@ -75,7 +78,8 @@ const appItems = [
   { name: "IT", icon: "▭", color: "linear-gradient(135deg, #5b8cff, #4b5df0)" },
 ];
 
-export default function App() {
+function Dashboard() {
+  const navigate = useNavigate();
   const [activeModule, setActiveModule] = useState<ModuleKey>("Home");
   const [loading, setLoading] = useState(false);
 
@@ -639,4 +643,16 @@ function getSidebarIcon(item: string) {
     default:
       return "•";
   }
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<AuthPage />} />
+        <Route path="/home" element={<Dashboard />} />
+        <Route path="/privacy" element={<Privacy />} />
+      </Routes>
+    </BrowserRouter>
+  );
 }
