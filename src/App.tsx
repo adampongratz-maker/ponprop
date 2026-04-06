@@ -50,7 +50,7 @@ const appItems: AppItem[] = [
   { name: "IT", icon: "▭", color: "linear-gradient(135deg, #5b8cff, #4b5df0)" },
 ];
 
-function App() {
+export default function App() {
   return (
     <div
       style={{
@@ -73,7 +73,6 @@ function App() {
           background: "#ffffff",
         }}
       >
-        {/* Sidebar */}
         <aside
           style={{
             background: "#f8fafc",
@@ -164,7 +163,6 @@ function App() {
           </div>
         </aside>
 
-        {/* Main */}
         <main
           style={{
             background: "#f3f4f6",
@@ -173,7 +171,6 @@ function App() {
             minWidth: 0,
           }}
         >
-          {/* Top bar */}
           <div
             style={{
               height: "68px",
@@ -278,7 +275,6 @@ function App() {
             </div>
           </div>
 
-          {/* Content */}
           <div
             style={{
               padding: "28px 28px 32px 28px",
