@@ -148,9 +148,9 @@ export default function AuthPage() {
 
   if (sessionCheckLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-blue-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-red-50 flex items-center justify-center" role="status" aria-label="Loading">
         <div className="text-center">
-          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-sky-600" />
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-orange-500" aria-hidden="true" />
           <p className="mt-3 text-slate-600">Loading...</p>
         </div>
       </div>
@@ -158,12 +158,14 @@ export default function AuthPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-blue-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-red-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="rounded-2xl bg-white shadow-lg p-8 border border-slate-100">
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-sky-600 to-blue-600 mb-4">
-              <span className="text-2xl font-bold text-white">▤</span>
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-orange-400 to-red-500 mb-4" aria-hidden="true">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" width="28" height="28" aria-hidden="true">
+                <path d="M12 2L2 10h3v10h5v-6h4v6h5V10h3L12 2z"/>
+              </svg>
             </div>
             <h1 className="text-4xl font-bold text-slate-900 mb-2">PonProp</h1>
             <p className="text-lg text-slate-500">Property Management Made Simple</p>
@@ -174,7 +176,7 @@ export default function AuthPage() {
             type="button"
             onClick={handleGoogleSignIn}
             disabled={loading}
-            className="w-full flex items-center justify-center gap-3 py-3 rounded-lg border border-slate-200 bg-white text-slate-700 font-semibold hover:bg-slate-50 hover:border-slate-300 hover:shadow-sm disabled:opacity-60 disabled:cursor-not-allowed transition"
+            className="w-full flex items-center justify-center gap-3 py-3 rounded-lg border border-slate-200 bg-white text-slate-700 font-semibold hover:bg-slate-50 hover:border-slate-300 hover:shadow-sm disabled:opacity-60 disabled:cursor-not-allowed transition focus:outline-none focus:ring-2 focus:ring-orange-300"
           >
             <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
               <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
@@ -204,7 +206,11 @@ export default function AuthPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
                 disabled={loading}
-                className="w-full px-4 py-3 rounded-lg border border-slate-200 bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-4 py-3 rounded-lg border border-slate-200 bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                maxLength={254}
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
               />
             </div>
 
@@ -220,7 +226,8 @@ export default function AuthPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter password"
                 disabled={loading}
-                className="w-full px-4 py-3 rounded-lg border border-slate-200 bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-4 py-3 rounded-lg border border-slate-200 bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                maxLength={128}
               />
             </div>
 
@@ -241,7 +248,7 @@ export default function AuthPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 rounded-lg bg-gradient-to-r from-sky-600 to-blue-600 text-white font-semibold hover:shadow-lg disabled:opacity-60 disabled:cursor-not-allowed transition"
+              className="w-full py-3 rounded-lg bg-gradient-to-r from-orange-500 to-red-500 text-white font-semibold hover:shadow-lg disabled:opacity-60 disabled:cursor-not-allowed transition focus:outline-none focus:ring-2 focus:ring-orange-300"
             >
               {loading ? "Please wait..." : "Sign In"}
             </button>
@@ -250,7 +257,7 @@ export default function AuthPage() {
               type="button"
               onClick={handleCreateAccount}
               disabled={loading}
-              className="w-full py-3 rounded-lg border border-slate-200 bg-white text-slate-700 font-semibold hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed transition"
+              className="w-full py-3 rounded-lg border border-slate-200 bg-white text-slate-700 font-semibold hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed transition focus:outline-none focus:ring-2 focus:ring-orange-300"
             >
               {loading ? "Please wait..." : "Create Account"}
             </button>
@@ -259,7 +266,7 @@ export default function AuthPage() {
               type="button"
               onClick={handleForgotPassword}
               disabled={loading}
-              className="w-full py-3 rounded-lg bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 disabled:opacity-60 disabled:cursor-not-allowed transition"
+              className="w-full py-3 rounded-lg bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200 disabled:opacity-60 disabled:cursor-not-allowed transition focus:outline-none focus:ring-2 focus:ring-orange-300"
             >
               Forgot Password?
             </button>

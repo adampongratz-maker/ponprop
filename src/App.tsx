@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "./lib/supabase";
-import { validateProperty, validateTenant } from "./lib/validation";
+import { validateProperty, validateTenant, validateLedgerEntry } from "./lib/validation";
 import AuthPage from "./pages/AuthPage";
 import Privacy from "./pages/Privacy";
 
@@ -25,7 +25,7 @@ type TenantRow = {
   id: string;
   name: string;
   unit: string;
-  rent: number;
+  balance: number;
   status: string;
 };
 
@@ -40,6 +40,14 @@ type LedgerRow = {
   method: string | null;
   user_id: string;
 };
+
+const IMPLEMENTED_MODULES: ModuleKey[] = [
+  "Home",
+  "Properties",
+  "Tenants",
+  "Accounting",
+  "Reports",
+];
 
 const sidebarItems = [
   "Home",
@@ -70,7 +78,7 @@ const appItems = [
   { name: "Maintenance", icon: "⚒", color: "linear-gradient(135deg, #ff8c66, #ff7a1a)" },
   { name: "Inventory", icon: "▣", color: "linear-gradient(135deg, #ffc928, #f0ac00)" },
   { name: "Time Cards", icon: "◔", color: "linear-gradient(135deg, #f59f3a, #e67c00)" },
-  { name: "Reports", icon: "⚠", color: "linear-gradient(135deg, #3cc8e8, #3378f4)" },
+  { name: "Reports", icon: "△", color: "linear-gradient(135deg, #3cc8e8, #3378f4)" },
   { name: "Accounting", icon: "$", color: "linear-gradient(135deg, #37d47d, #14b85b)" },
   { name: "Properties", icon: "▤", color: "linear-gradient(135deg, #4bb7f0, #2b6ef3)" },
   { name: "Projects", icon: "▥", color: "linear-gradient(135deg, #b47cff, #7e42ea)" },
@@ -82,6 +90,21 @@ const appItems = [
   { name: "Analytics", icon: "◔", color: "linear-gradient(135deg, #8b68ff, #5d48eb)" },
   { name: "IT", icon: "▭", color: "linear-gradient(135deg, #5b8cff, #4b5df0)" },
 ];
+
+function statusBadgeClass(status: string): string {
+  switch (status) {
+    case "Active":
+      return "bg-emerald-100 text-emerald-700";
+    case "Inactive":
+      return "bg-slate-100 text-slate-600";
+    case "Maintenance":
+      return "bg-amber-100 text-amber-700";
+    case "Evicted":
+      return "bg-rose-100 text-rose-700";
+    default:
+      return "bg-slate-100 text-slate-600";
+  }
+}
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null | undefined>(undefined);
@@ -98,9 +121,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (user === undefined) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-blue-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-red-50 flex items-center justify-center" role="status" aria-label="Loading">
         <div className="text-center">
-          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-sky-600" />
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-orange-500" aria-hidden="true" />
           <p className="mt-3 text-slate-600">Loading...</p>
         </div>
       </div>
@@ -114,15 +137,57 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+// Inline error/success message component
+function FormMessage({ error, success }: { error?: string; success?: string }) {
+  if (error) {
+    return (
+      <div role="alert" className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-sm font-medium flex items-start gap-2">
+        <span aria-hidden="true">⚠</span>
+        <span>{error}</span>
+      </div>
+    );
+  }
+  if (success) {
+    return (
+      <div role="status" className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm font-medium flex items-start gap-2">
+        <span aria-hidden="true">✓</span>
+        <span>{success}</span>
+      </div>
+    );
+  }
+  return null;
+}
+
+function ComingSoonBanner({ module: mod }: { module: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-24 text-center">
+      <div className="text-5xl mb-4" aria-hidden="true">🚧</div>
+      <h2 className="text-2xl font-bold text-slate-900 mb-2">{mod}</h2>
+      <p className="text-slate-500 max-w-xs">This module is coming soon. Check back for updates.</p>
+    </div>
+  );
+}
+
 function Dashboard() {
   const navigate = useNavigate();
   const [activeModule, setActiveModule] = useState<ModuleKey>("Home");
+  const [activeUnimplemented, setActiveUnimplemented] = useState<string | null>(null);
   const [authUser, setAuthUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [dataLoading, setDataLoading] = useState(false);
 
   const [properties, setProperties] = useState<PropertyRow[]>([]);
   const [tenants, setTenants] = useState<TenantRow[]>([]);
   const [transactions, setTransactions] = useState<LedgerRow[]>([]);
+
+  // Per-form submitting state
+  const [propSubmitting, setPropSubmitting] = useState(false);
+  const [tenantSubmitting, setTenantSubmitting] = useState(false);
+  const [txSubmitting, setTxSubmitting] = useState(false);
+
+  // Per-form inline messages
+  const [propMsg, setPropMsg] = useState<{ error?: string; success?: string }>({});
+  const [tenantMsg, setTenantMsg] = useState<{ error?: string; success?: string }>({});
+  const [txMsg, setTxMsg] = useState<{ error?: string; success?: string }>({});
 
   const [newProperty, setNewProperty] = useState({
     name: "",
@@ -148,8 +213,7 @@ function Dashboard() {
   });
 
   async function loadAllData() {
-    setLoading(true);
-
+    setDataLoading(true);
     try {
       const [propRes, tenantRes, transRes] = await Promise.all([
         supabase.from("properties").select("*").order("created_at", { ascending: false }),
@@ -157,14 +221,9 @@ function Dashboard() {
         supabase.from("ledger_entries").select("*").order("date", { ascending: false }),
       ]);
 
-      if (propRes.error || tenantRes.error || transRes.error) {
-        console.error("Error loading data", propRes.error || tenantRes.error || transRes.error);
-        setProperties([]);
-        setTenants([]);
-        setTransactions([]);
-        setLoading(false);
-        return;
-      }
+      if (propRes.error) console.error("Error loading properties", propRes.error);
+      if (tenantRes.error) console.error("Error loading tenants", tenantRes.error);
+      if (transRes.error) console.error("Error loading ledger", transRes.error);
 
       setProperties((propRes.data as PropertyRow[]) || []);
       setTenants((tenantRes.data as TenantRow[]) || []);
@@ -172,13 +231,11 @@ function Dashboard() {
     } catch (e) {
       console.error("Unexpected error loading data", e);
     } finally {
-      setLoading(false);
+      setDataLoading(false);
     }
   }
 
-  useEffect(() => {
-    loadAllData();
-  }, []);
+  useEffect(() => { loadAllData(); }, []);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => setAuthUser(user));
@@ -189,26 +246,20 @@ function Dashboard() {
   }, []);
 
   const totalIncome = useMemo(
-    () =>
-      transactions
-        .filter((t) => t.type === "Income")
-        .reduce((sum, t) => sum + Number(t.amount), 0),
+    () => transactions.filter((t) => t.type === "Income").reduce((sum, t) => sum + Number(t.amount), 0),
     [transactions]
   );
-
   const totalExpenses = useMemo(
-    () =>
-      transactions
-        .filter((t) => t.type === "Expense")
-        .reduce((sum, t) => sum + Number(t.amount), 0),
+    () => transactions.filter((t) => t.type === "Expense").reduce((sum, t) => sum + Number(t.amount), 0),
     [transactions]
   );
-
   const netProfit = totalIncome - totalExpenses;
 
-  async function addProperty() {
+  async function addProperty(e: React.FormEvent) {
+    e.preventDefault();
+    setPropMsg({});
+    setPropSubmitting(true);
     try {
-      // Validate input before sending to database
       const validated = validateProperty({
         name: newProperty.name,
         address: newProperty.address,
@@ -216,26 +267,32 @@ function Dashboard() {
         status: newProperty.status,
       });
 
-      const { data, error } = await supabase.from("properties").insert([validated]);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { setPropMsg({ error: "Not authenticated. Please sign in again." }); return; }
+
+      const { error } = await supabase.from("properties").insert([{ ...validated, user_id: user.id }]);
       if (error) {
-        console.error("❌ Failed to add property", error);
-        // Show generic error to user, keep detailed error in console
-        alert("Failed to add property. Please try again.");
+        console.error("Failed to add property", error);
+        setPropMsg({ error: "Failed to add property. Please try again." });
         return;
       }
-
       setNewProperty({ name: "", address: "", units: 1, status: "Active" });
+      setPropMsg({ success: "Property added successfully." });
       loadAllData();
-    } catch (e: any) {
-      console.error("❌ Property validation error:", e.message);
-      // Show validation error to user
-      alert("Invalid property data: " + e.message);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Invalid property data.";
+      console.error("Property validation error:", msg);
+      setPropMsg({ error: msg });
+    } finally {
+      setPropSubmitting(false);
     }
   }
 
-  async function addTenant() {
+  async function addTenant(e: React.FormEvent) {
+    e.preventDefault();
+    setTenantMsg({});
+    setTenantSubmitting(true);
     try {
-      // Validate input before sending to database
       const validated = validateTenant({
         name: newTenant.name,
         unit: newTenant.unit,
@@ -244,71 +301,96 @@ function Dashboard() {
       });
 
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { alert("Not authenticated"); return; }
+      if (!user) { setTenantMsg({ error: "Not authenticated. Please sign in again." }); return; }
 
-      const { data, error } = await supabase.from("tenants").insert([{ ...validated, user_id: user.id }]);
+      const { error } = await supabase.from("tenants").insert([{ ...validated, user_id: user.id }]);
       if (error) {
-        console.error("❌ Failed to add tenant", error);
-        alert("Failed to add tenant. Please try again.");
+        console.error("Failed to add tenant", error);
+        setTenantMsg({ error: "Failed to add tenant. Please try again." });
         return;
       }
-
       setNewTenant({ name: "", unit: "", balance: 0, status: "Active" });
+      setTenantMsg({ success: "Tenant added successfully." });
       loadAllData();
-    } catch (e: any) {
-      console.error("❌ Tenant validation error:", e.message);
-      alert("Invalid tenant data: " + e.message);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Invalid tenant data.";
+      console.error("Tenant validation error:", msg);
+      setTenantMsg({ error: msg });
+    } finally {
+      setTenantSubmitting(false);
     }
   }
 
-  async function addTransaction() {
+  async function addTransaction(e: React.FormEvent) {
+    e.preventDefault();
+    setTxMsg({});
+    setTxSubmitting(true);
     try {
-      if (!newTransaction.date) { alert("Date is required."); return; }
-      if (!newTransaction.amount) { alert("Amount is required."); return; }
-
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { alert("Not authenticated"); return; }
-
-      const { error } = await supabase.from("ledger_entries").insert([{
-        user_id: user.id,
+      const validated = validateLedgerEntry({
         date: newTransaction.date,
         type: newTransaction.type,
-        amount: Number(newTransaction.amount),
-        tenant: newTransaction.tenant.trim() || null,
-        property: newTransaction.property.trim() || null,
-        method: newTransaction.method.trim() || null,
-      }]);
+        amount: newTransaction.amount,
+        tenant: newTransaction.tenant,
+        property: newTransaction.property,
+        method: newTransaction.method,
+      });
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { setTxMsg({ error: "Not authenticated. Please sign in again." }); return; }
+
+      const { error } = await supabase.from("ledger_entries").insert([{ ...validated, user_id: user.id }]);
       if (error) {
-        console.error("❌ Failed to add ledger entry", error);
-        alert("Failed to add entry. Please try again.");
+        console.error("Failed to add ledger entry", error);
+        setTxMsg({ error: "Failed to add entry. Please try again." });
         return;
       }
-
       setNewTransaction({ date: "", type: "Income", amount: 0, tenant: "", property: "", method: "" });
+      setTxMsg({ success: "Transaction recorded." });
       loadAllData();
-    } catch (e: any) {
-      console.error("❌ Ledger entry error:", e.message);
-      alert("Error: " + e.message);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Invalid transaction data.";
+      console.error("Ledger entry error:", msg);
+      setTxMsg({ error: msg });
+    } finally {
+      setTxSubmitting(false);
     }
   }
+
+  function handleSidebarClick(item: string) {
+    if (IMPLEMENTED_MODULES.includes(item as ModuleKey)) {
+      setActiveModule(item as ModuleKey);
+      setActiveUnimplemented(null);
+    } else {
+      setActiveUnimplemented(item);
+      setActiveModule("Home"); // reset so module panels hide
+    }
+  }
+
+  // Determine what label to show as "active" in sidebar
+  const activeSidebarItem = activeUnimplemented ?? activeModule;
+
+  const inputClass = "w-full px-3 py-2.5 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition disabled:opacity-50";
+  const labelClass = "block text-xs font-semibold text-slate-600 mb-1";
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 p-1 box-border">
-      <div className="grid min-h-[calc(100vh-8px)] grid-cols-1 lg:grid-cols-[280px_1fr] rounded-2xl overflow-hidden border border-slate-200 bg-white shadow-sm">
+      <div className="grid min-h-[calc(100vh-8px)] grid-cols-1 lg:grid-cols-[260px_1fr] rounded-2xl overflow-hidden border border-slate-200 bg-white shadow-sm">
 
-        <aside className="flex flex-col bg-gradient-to-b from-slate-50 to-white border-b border-slate-200 lg:border-b-0 lg:border-r h-full">
+        {/* Sidebar */}
+        <aside className="flex flex-col bg-gradient-to-b from-slate-50 to-white border-b border-slate-200 lg:border-b-0 lg:border-r h-full" role="navigation" aria-label="Main navigation">
           <div
-            className="flex items-center gap-3 border-b border-slate-200 bg-white px-5 py-4"
-            style={{ cursor: "pointer" }}
+            className="flex items-center gap-3 border-b border-slate-200 bg-white px-5 py-4 cursor-pointer hover:bg-slate-50 transition"
             onClick={() => navigate("/")}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => e.key === "Enter" && navigate("/")}
+            aria-label="PonProp home"
           >
             <img
               src="/logo.png"
-              alt="PonProp Logo"
+              alt="PonProp logo"
               style={{ height: "32px", width: "auto", objectFit: "contain" }}
-              onError={(event) => {
-                (event.currentTarget as HTMLImageElement).style.display = "none";
-              }}
+              onError={(event) => { (event.currentTarget as HTMLImageElement).style.display = "none"; }}
             />
             <div className="flex flex-col">
               <span className="text-sm font-bold text-slate-900">PonProp</span>
@@ -316,48 +398,43 @@ function Dashboard() {
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-2 py-3 space-y-1">
+          <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-0.5">
             {sidebarItems.map((item) => {
-              const isActive = item === activeModule;
+              const isActive = item === activeSidebarItem;
+              const isImplemented = IMPLEMENTED_MODULES.includes(item as ModuleKey);
               return (
                 <button
                   key={item}
                   type="button"
-                  onClick={() => {
-                    if (
-                      item === "Home" ||
-                      item === "Properties" ||
-                      item === "Tenants" ||
-                      item === "Accounting" ||
-                      item === "Reports"
-                    ) {
-                      setActiveModule(item as ModuleKey);
-                    }
-                  }}
+                  onClick={() => handleSidebarClick(item)}
+                  aria-current={isActive ? "page" : undefined}
                   className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-medium transition duration-200 ${
-                    isActive 
-                      ? "bg-gradient-to-r from-sky-100 to-blue-100 text-sky-700 shadow-sm" 
-                      : "text-slate-600 hover:bg-slate-100"
+                    isActive
+                      ? "bg-gradient-to-r from-orange-100 to-red-100 text-orange-700 shadow-sm"
+                      : isImplemented
+                        ? "text-slate-600 hover:bg-slate-100"
+                        : "text-slate-400 hover:bg-slate-50"
                   }`}
-                  style={{ cursor: "pointer", border: "none" }}
                 >
-                  <span style={{ width: "16px", textAlign: "center", fontSize: "16px" }}>
+                  <span style={{ width: "16px", textAlign: "center", fontSize: "16px" }} aria-hidden="true">
                     {getSidebarIcon(item)}
                   </span>
                   <span className="flex-1">{item}</span>
-                  {isActive && <span className="text-sky-600">●</span>}
+                  {isActive && <span className="text-orange-500" aria-hidden="true">●</span>}
+                  {!isImplemented && !isActive && (
+                    <span className="text-[9px] text-slate-300 font-normal">soon</span>
+                  )}
                 </button>
               );
             })}
-          </div>
+          </nav>
         </aside>
 
+        {/* Main content */}
         <main className="flex min-w-0 flex-col bg-gradient-to-br from-slate-50 to-slate-100 h-full">
-          <div className="flex h-14 items-center justify-between gap-4 border-b border-slate-200 bg-white px-6 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="text-xl font-bold text-slate-900">PonProp Dashboard</div>
-            </div>
-
+          {/* Top bar */}
+          <header className="flex h-14 items-center justify-between gap-4 border-b border-slate-200 bg-white px-6 shadow-sm">
+            <div className="text-xl font-bold text-slate-900">PonProp</div>
             <div className="flex items-center gap-3">
               {authUser && (
                 <span className="hidden sm:block text-sm text-slate-600 font-medium truncate max-w-[160px]">
@@ -367,146 +444,187 @@ function Dashboard() {
               {authUser?.user_metadata?.avatar_url ? (
                 <img
                   src={authUser.user_metadata.avatar_url}
-                  alt="Profile"
+                  alt={`${authUser.user_metadata?.full_name || authUser.email} profile`}
                   className="h-8 w-8 rounded-full object-cover ring-2 ring-slate-200"
                   referrerPolicy="no-referrer"
                 />
               ) : (
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-sky-500 to-blue-600 text-white font-semibold text-xs">
-                  {authUser?.user_metadata?.full_name?.[0]?.toUpperCase() ||
-                    authUser?.email?.[0]?.toUpperCase() || "PP"}
+                <div
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 to-red-500 text-white font-semibold text-xs"
+                  aria-hidden="true"
+                >
+                  {authUser?.user_metadata?.full_name?.[0]?.toUpperCase() || authUser?.email?.[0]?.toUpperCase() || "PP"}
                 </div>
               )}
               <button
-                onClick={async () => {
-                  await supabase.auth.signOut();
-                  navigate("/");
-                }}
-                className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 border border-slate-200 transition"
+                onClick={async () => { await supabase.auth.signOut(); navigate("/"); }}
+                className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 border border-slate-200 transition focus:outline-none focus:ring-2 focus:ring-orange-300"
               >
                 Sign Out
               </button>
             </div>
-          </div>
+          </header>
 
           <div className="flex-1 overflow-y-auto p-6">
-            {loading && <div style={{ marginBottom: "16px" }}>Loading...</div>}
+            {dataLoading && (
+              <div className="flex items-center gap-2 mb-4 text-sm text-slate-500" role="status" aria-live="polite">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-orange-500" aria-hidden="true" />
+                Loading data…
+              </div>
+            )}
 
-            {activeModule === "Home" && (
+            {/* Coming soon panel for unimplemented modules */}
+            {activeUnimplemented && <ComingSoonBanner module={activeUnimplemented} />}
+
+            {/* HOME */}
+            {!activeUnimplemented && activeModule === "Home" && (
               <>
-                <div className="mb-2">
-                  <h1 className="text-4xl font-bold tracking-tight text-slate-900">
-                    Welcome back 👋
-                  </h1>
+                <div className="mb-8">
+                  <h1 className="text-4xl font-bold tracking-tight text-slate-900">Welcome back 👋</h1>
                   <p className="text-slate-600 mt-2">Manage all your properties in one place</p>
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 mt-8">
-                  {appItems.map((item) => (
-                    <button
-                      key={item.name}
-                      type="button"
-                      onClick={() => {
-                        if (
-                          item.name === "Home" ||
-                          item.name === "Properties" ||
-                          item.name === "Tenants" ||
-                          item.name === "Accounting" ||
-                          item.name === "Reports"
-                        ) {
-                          setActiveModule(item.name as ModuleKey);
-                        }
-                      }}
-                      className="group rounded-2xl border border-slate-200 bg-white min-h-[140px] p-5 text-left transition duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:border-slate-300"
-                    >
-                      <div
-                        style={{
-                          width: "56px",
-                          height: "56px",
-                          borderRadius: "14px",
-                          background: item.color,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          color: "#ffffff",
-                          fontSize: "28px",
-                          fontWeight: 700,
-                          marginBottom: "10px",
-                          boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                        }}
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {appItems.map((item) => {
+                    const isImplemented = IMPLEMENTED_MODULES.includes(item.name as ModuleKey);
+                    return (
+                      <button
+                        key={item.name}
+                        type="button"
+                        onClick={() => handleSidebarClick(item.name)}
+                        aria-label={`Open ${item.name} module${!isImplemented ? " (coming soon)" : ""}`}
+                        className="group rounded-2xl border border-slate-200 bg-white min-h-[140px] p-5 text-left transition duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-orange-300"
                       >
-                        {item.icon}
-                      </div>
-
-                      <div className="text-sm font-semibold text-slate-900 group-hover:text-slate-700">
-                        {item.name}
-                      </div>
-                    </button>
-                  ))}
+                        <div
+                          style={{
+                            width: "56px",
+                            height: "56px",
+                            borderRadius: "14px",
+                            background: item.color,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            color: "#ffffff",
+                            fontSize: "28px",
+                            fontWeight: 700,
+                            marginBottom: "10px",
+                            boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                            opacity: isImplemented ? 1 : 0.7,
+                          }}
+                          aria-hidden="true"
+                        >
+                          {item.icon}
+                        </div>
+                        <div className="text-sm font-semibold text-slate-900 group-hover:text-slate-700">
+                          {item.name}
+                        </div>
+                        {!isImplemented && (
+                          <div className="text-xs text-slate-400 mt-0.5">Coming soon</div>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               </>
             )}
 
-            {activeModule === "Properties" && (
+            {/* PROPERTIES */}
+            {!activeUnimplemented && activeModule === "Properties" && (
               <>
                 <h1 className="text-3xl font-bold text-slate-900 mb-6 flex items-center gap-3">
-                  <span>▤</span> Properties
+                  <span aria-hidden="true">▤</span> Properties
                 </h1>
 
                 <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm mb-6">
-                  <h3 className="text-lg font-semibold text-slate-900 mb-4">Add New Property</h3>
-                  <div className="grid gap-3 mb-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))" }}>
-                    <input
-                      className="px-3 py-2.5 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
-                      placeholder="Property Name"
-                      value={newProperty.name}
-                      onChange={(e) => setNewProperty({ ...newProperty, name: e.target.value })}
-                    />
-                    <input
-                      className="px-3 py-2.5 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
-                      placeholder="Address"
-                      value={newProperty.address}
-                      onChange={(e) => setNewProperty({ ...newProperty, address: e.target.value })}
-                    />
-                    <input
-                      className="px-3 py-2.5 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
-                      type="number"
-                      placeholder="Units"
-                      value={newProperty.units}
-                      onChange={(e) => setNewProperty({ ...newProperty, units: Number(e.target.value) })}
-                    />
-                    <input
-                      className="px-3 py-2.5 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
-                      placeholder="Status"
-                      value={newProperty.status}
-                      onChange={(e) => setNewProperty({ ...newProperty, status: e.target.value })}
-                    />
-                  </div>
-                  <button className="px-4 py-2.5 rounded-lg bg-gradient-to-r from-sky-600 to-blue-600 text-white text-sm font-semibold hover:shadow-md active:scale-95 transition" onClick={addProperty}>
-                    + Add Property
-                  </button>
+                  <h2 className="text-lg font-semibold text-slate-900 mb-4">Add New Property</h2>
+                  <form onSubmit={addProperty} noValidate>
+                    <div className="grid gap-4 mb-4 sm:grid-cols-2 xl:grid-cols-4">
+                      <div>
+                        <label htmlFor="prop-name" className={labelClass}>Property Name *</label>
+                        <input
+                          id="prop-name"
+                          className={inputClass}
+                          placeholder="e.g. Maple Apartments"
+                          value={newProperty.name}
+                          onChange={(e) => setNewProperty({ ...newProperty, name: e.target.value })}
+                          maxLength={255}
+                          required
+                          aria-required="true"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="prop-address" className={labelClass}>Address *</label>
+                        <input
+                          id="prop-address"
+                          className={inputClass}
+                          placeholder="123 Main St, City, ST"
+                          value={newProperty.address}
+                          onChange={(e) => setNewProperty({ ...newProperty, address: e.target.value })}
+                          maxLength={500}
+                          required
+                          aria-required="true"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="prop-units" className={labelClass}>Number of Units *</label>
+                        <input
+                          id="prop-units"
+                          className={inputClass}
+                          type="number"
+                          min={1}
+                          max={10000}
+                          placeholder="1"
+                          value={newProperty.units}
+                          onChange={(e) => setNewProperty({ ...newProperty, units: Number(e.target.value) })}
+                          required
+                          aria-required="true"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="prop-status" className={labelClass}>Status</label>
+                        <select
+                          id="prop-status"
+                          className={inputClass}
+                          value={newProperty.status}
+                          onChange={(e) => setNewProperty({ ...newProperty, status: e.target.value })}
+                        >
+                          <option value="Active">Active</option>
+                          <option value="Inactive">Inactive</option>
+                          <option value="Maintenance">Maintenance</option>
+                        </select>
+                      </div>
+                    </div>
+                    <FormMessage {...propMsg} />
+                    <button
+                      type="submit"
+                      disabled={propSubmitting}
+                      className="mt-3 px-5 py-2.5 rounded-lg bg-gradient-to-r from-orange-500 to-red-500 text-white text-sm font-semibold hover:shadow-md active:scale-95 transition disabled:opacity-60 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-orange-300"
+                    >
+                      {propSubmitting ? "Saving…" : "+ Add Property"}
+                    </button>
+                  </form>
                 </div>
 
                 <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                  <h3 className="text-lg font-semibold text-slate-900 mb-4">Property List</h3>
+                  <h2 className="text-lg font-semibold text-slate-900 mb-4">Property List</h2>
                   <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
+                    <table className="w-full text-sm" aria-label="Properties">
                       <thead>
                         <tr className="border-b border-slate-200">
-                          <th className="text-left py-3 px-4 font-semibold text-slate-600">Name</th>
-                          <th className="text-left py-3 px-4 font-semibold text-slate-600">Address</th>
-                          <th className="text-left py-3 px-4 font-semibold text-slate-600">Units</th>
-                          <th className="text-left py-3 px-4 font-semibold text-slate-600">Status</th>
+                          <th scope="col" className="text-left py-3 px-4 font-semibold text-slate-600">Name</th>
+                          <th scope="col" className="text-left py-3 px-4 font-semibold text-slate-600">Address</th>
+                          <th scope="col" className="text-left py-3 px-4 font-semibold text-slate-600">Units</th>
+                          <th scope="col" className="text-left py-3 px-4 font-semibold text-slate-600">Status</th>
                         </tr>
                       </thead>
                       <tbody>
                         {properties.map((property) => (
                           <tr key={property.id} className="border-b border-slate-100 hover:bg-slate-50 transition">
-                            <td className="py-3 px-4 text-slate-900">{property.name}</td>
+                            <td className="py-3 px-4 text-slate-900 font-medium">{property.name}</td>
                             <td className="py-3 px-4 text-slate-600">{property.address}</td>
                             <td className="py-3 px-4 text-slate-600">{property.units}</td>
                             <td className="py-3 px-4">
-                              <span className="px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+                              <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusBadgeClass(property.status)}`}>
                                 {property.status}
                               </span>
                             </td>
@@ -514,193 +632,287 @@ function Dashboard() {
                         ))}
                       </tbody>
                     </table>
-                    {properties.length === 0 && (
-                      <div className="text-center py-12 text-slate-500">
-                        No properties yet. Add your first property above.
-                      </div>
+                    {!dataLoading && properties.length === 0 && (
+                      <p className="text-center py-12 text-slate-400 text-sm">No properties yet. Add your first property above.</p>
                     )}
                   </div>
                 </div>
               </>
             )}
 
-            {activeModule === "Tenants" && (
+            {/* TENANTS */}
+            {!activeUnimplemented && activeModule === "Tenants" && (
               <>
-                <h1 className="text-2xl font-semibold text-slate-900 mb-4">Tenants</h1>
+                <h1 className="text-3xl font-bold text-slate-900 mb-6">Tenants</h1>
 
-                <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm mb-8">
-                  <h3 className="text-lg font-semibold text-slate-900 mb-4">Add Tenant</h3>
-                  <div className="grid gap-3 mb-3.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
-                    <input
-                      className="px-3.5 py-3 rounded-3xl border border-slate-200 bg-white"
-                      placeholder="Tenant Name"
-                      value={newTenant.name}
-                      onChange={(e) => setNewTenant({ ...newTenant, name: e.target.value })}
-                    />
-                    <input
-                      className="px-3.5 py-3 rounded-3xl border border-slate-200 bg-white"
-                      placeholder="Unit"
-                      value={newTenant.unit}
-                      onChange={(e) => setNewTenant({ ...newTenant, unit: e.target.value })}
-                    />
-                    <input
-                      className="px-3.5 py-3 rounded-3xl border border-slate-200 bg-white"
-                      type="number"
-                      placeholder="Balance"
-                      value={newTenant.balance}
-                      onChange={(e) =>
-                        setNewTenant({ ...newTenant, balance: Number(e.target.value) })
-                      }
-                    />
-                    <input
-                      className="px-3.5 py-3 rounded-3xl border border-slate-200 bg-white"
-                      placeholder="Status"
-                      value={newTenant.status}
-                      onChange={(e) => setNewTenant({ ...newTenant, status: e.target.value })}
-                    />
-                  </div>
-                  <button className="px-4 py-3 rounded-3xl bg-sky-600 text-white font-semibold hover:bg-sky-700 transition" onClick={addTenant}>
-                    Save Tenant
-                  </button>
-                </div>
-
-                <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                  <h3 className="text-lg font-semibold text-slate-900 mb-4">Tenant List</h3>
-                  <table className="min-w-full border-collapse">
-                    <thead>
-                      <tr className="text-left text-sm text-slate-600">
-                        <th className="pb-3 pr-6">Name</th>
-                        <th className="pb-3 pr-6">Unit</th>
-                        <th className="pb-3 pr-6">Rent</th>
-                        <th className="pb-3">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {tenants.map((tenant) => (
-                        <tr key={tenant.id} className="border-t border-slate-200">
-                          <td className="py-4 pr-6 text-sm text-slate-700">{tenant.name}</td>
-                          <td className="py-4 pr-6 text-sm text-slate-700">{tenant.unit}</td>
-                          <td className="py-4 pr-6 text-sm text-slate-700">${tenant.balance ?? 0}</td>
-                          <td className="py-4 text-sm text-slate-700">{tenant.status}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </>
-            )}
-
-            {activeModule === "Accounting" && (
-              <>
-                <h1 className="text-2xl font-semibold text-slate-900 mb-4">Accounting</h1>
-
-                <div className="grid gap-5 md:grid-cols-3 mb-8">
-                  <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <div className="text-sm text-slate-500 mb-2">Income</div>
-                    <div className="text-3xl font-extrabold text-slate-900">${totalIncome.toLocaleString()}</div>
-                  </div>
-                  <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <div className="text-sm text-slate-500 mb-2">Expenses</div>
-                    <div className="text-3xl font-extrabold text-slate-900">${totalExpenses.toLocaleString()}</div>
-                  </div>
-                  <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <div className="text-sm text-slate-500 mb-2">Net Profit</div>
-                    <div className={`text-3xl font-extrabold ${netProfit >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
-                      ${netProfit.toLocaleString()}
+                <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm mb-6">
+                  <h2 className="text-lg font-semibold text-slate-900 mb-4">Add Tenant</h2>
+                  <form onSubmit={addTenant} noValidate>
+                    <div className="grid gap-4 mb-4 sm:grid-cols-2 xl:grid-cols-4">
+                      <div>
+                        <label htmlFor="tenant-name" className={labelClass}>Full Name *</label>
+                        <input
+                          id="tenant-name"
+                          className={inputClass}
+                          placeholder="Jane Smith"
+                          value={newTenant.name}
+                          onChange={(e) => setNewTenant({ ...newTenant, name: e.target.value })}
+                          maxLength={255}
+                          required
+                          aria-required="true"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="tenant-unit" className={labelClass}>Unit</label>
+                        <input
+                          id="tenant-unit"
+                          className={inputClass}
+                          placeholder="e.g. 2B"
+                          value={newTenant.unit}
+                          onChange={(e) => setNewTenant({ ...newTenant, unit: e.target.value })}
+                          maxLength={100}
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="tenant-balance" className={labelClass}>Balance ($)</label>
+                        <input
+                          id="tenant-balance"
+                          className={inputClass}
+                          type="number"
+                          min={0}
+                          max={1000000}
+                          placeholder="0"
+                          value={newTenant.balance}
+                          onChange={(e) => setNewTenant({ ...newTenant, balance: Number(e.target.value) })}
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="tenant-status" className={labelClass}>Status</label>
+                        <select
+                          id="tenant-status"
+                          className={inputClass}
+                          value={newTenant.status}
+                          onChange={(e) => setNewTenant({ ...newTenant, status: e.target.value })}
+                        >
+                          <option value="Active">Active</option>
+                          <option value="Inactive">Inactive</option>
+                          <option value="Evicted">Evicted</option>
+                        </select>
+                      </div>
                     </div>
-                  </div>
-                </div>
-
-                <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm mb-8">
-                  <h3 className="text-lg font-semibold text-slate-900 mb-4">Add Transaction</h3>
-                  <div className="grid gap-3 mb-3.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
-                    <input
-                      className="px-3.5 py-3 rounded-3xl border border-slate-200 bg-white"
-                      type="date"
-                      value={newTransaction.date}
-                      onChange={(e) => setNewTransaction({ ...newTransaction, date: e.target.value })}
-                    />
-                    <select
-                      className="px-3.5 py-3 rounded-3xl border border-slate-200 bg-white"
-                      value={newTransaction.type}
-                      onChange={(e) => setNewTransaction({ ...newTransaction, type: e.target.value })}
+                    <FormMessage {...tenantMsg} />
+                    <button
+                      type="submit"
+                      disabled={tenantSubmitting}
+                      className="mt-3 px-5 py-2.5 rounded-lg bg-gradient-to-r from-orange-500 to-red-500 text-white text-sm font-semibold hover:shadow-md active:scale-95 transition disabled:opacity-60 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-orange-300"
                     >
-                      <option value="Income">Income</option>
-                      <option value="Expense">Expense</option>
-                    </select>
-                    <input
-                      className="px-3.5 py-3 rounded-3xl border border-slate-200 bg-white"
-                      type="number"
-                      placeholder="Amount"
-                      value={newTransaction.amount}
-                      onChange={(e) => setNewTransaction({ ...newTransaction, amount: Number(e.target.value) })}
-                    />
-                    <input
-                      className="px-3.5 py-3 rounded-3xl border border-slate-200 bg-white"
-                      placeholder="Tenant"
-                      value={newTransaction.tenant}
-                      onChange={(e) => setNewTransaction({ ...newTransaction, tenant: e.target.value })}
-                    />
-                    <input
-                      className="px-3.5 py-3 rounded-3xl border border-slate-200 bg-white"
-                      placeholder="Property"
-                      value={newTransaction.property}
-                      onChange={(e) => setNewTransaction({ ...newTransaction, property: e.target.value })}
-                    />
-                    <input
-                      className="px-3.5 py-3 rounded-3xl border border-slate-200 bg-white"
-                      placeholder="Payment method"
-                      value={newTransaction.method}
-                      onChange={(e) => setNewTransaction({ ...newTransaction, method: e.target.value })}
-                    />
-                  </div>
-                  <button className="px-4 py-3 rounded-3xl bg-sky-600 text-white font-semibold hover:bg-sky-700 transition" onClick={addTransaction}>
-                    Save Entry
-                  </button>
+                      {tenantSubmitting ? "Saving…" : "Save Tenant"}
+                    </button>
+                  </form>
                 </div>
 
-                <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                  <h3 className="text-lg font-semibold text-slate-900 mb-4">Transactions</h3>
-                  <table className="min-w-full border-collapse">
-                    <thead>
-                      <tr className="text-left text-sm text-slate-600">
-                        <th className="pb-3 pr-6">Date</th>
-                        <th className="pb-3 pr-6">Type</th>
-                        <th className="pb-3 pr-6">Amount</th>
-                        <th className="pb-3 pr-6">Tenant</th>
-                        <th className="pb-3 pr-6">Property</th>
-                        <th className="pb-3">Method</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {transactions.map((transaction) => (
-                        <tr key={transaction.id} className="border-t border-slate-200">
-                          <td className="py-4 pr-6 text-sm text-slate-700">{transaction.date}</td>
-                          <td className="py-4 pr-6 text-sm text-slate-700">{transaction.type}</td>
-                          <td className={`py-4 pr-6 text-sm font-medium ${transaction.type === "Income" ? "text-emerald-600" : "text-rose-600"}`}>${Number(transaction.amount).toLocaleString()}</td>
-                          <td className="py-4 pr-6 text-sm text-slate-700">{transaction.tenant || "—"}</td>
-                          <td className="py-4 pr-6 text-sm text-slate-700">{transaction.property || "—"}</td>
-                          <td className="py-4 text-sm text-slate-700">{transaction.method || "—"}</td>
+                <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                  <h2 className="text-lg font-semibold text-slate-900 mb-4">Tenant List</h2>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm" aria-label="Tenants">
+                      <thead>
+                        <tr className="border-b border-slate-200">
+                          <th scope="col" className="text-left py-3 px-4 font-semibold text-slate-600">Name</th>
+                          <th scope="col" className="text-left py-3 px-4 font-semibold text-slate-600">Unit</th>
+                          <th scope="col" className="text-left py-3 px-4 font-semibold text-slate-600">Balance</th>
+                          <th scope="col" className="text-left py-3 px-4 font-semibold text-slate-600">Status</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {tenants.map((tenant) => (
+                          <tr key={tenant.id} className="border-b border-slate-100 hover:bg-slate-50 transition">
+                            <td className="py-3 px-4 text-slate-900 font-medium">{tenant.name}</td>
+                            <td className="py-3 px-4 text-slate-600">{tenant.unit || "—"}</td>
+                            <td className="py-3 px-4 text-slate-700">${(tenant.balance ?? 0).toLocaleString()}</td>
+                            <td className="py-3 px-4">
+                              <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusBadgeClass(tenant.status)}`}>
+                                {tenant.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {!dataLoading && tenants.length === 0 && (
+                      <p className="text-center py-12 text-slate-400 text-sm">No tenants yet. Add your first tenant above.</p>
+                    )}
+                  </div>
                 </div>
               </>
             )}
 
-            {activeModule === "Reports" && (
+            {/* ACCOUNTING */}
+            {!activeUnimplemented && activeModule === "Accounting" && (
               <>
-                <h1 className="text-2xl font-semibold text-slate-900 mb-4">Reports</h1>
-                <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                  <h3 className="text-lg font-semibold text-slate-900 mb-4">Portfolio Summary</h3>
-                  <div className="space-y-3 leading-7 text-slate-700">
-                    <div>Total Properties: {properties.length}</div>
-                    <div>Total Tenants: {tenants.length}</div>
-                    <div>Total Income: ${totalIncome.toLocaleString()}</div>
-                    <div>Total Expenses: ${totalExpenses.toLocaleString()}</div>
-                    <div>Net Profit: ${netProfit.toLocaleString()}</div>
+                <h1 className="text-3xl font-bold text-slate-900 mb-6">Accounting</h1>
+
+                <div className="grid gap-4 md:grid-cols-3 mb-6">
+                  {[
+                    { label: "Total Income", value: totalIncome, color: "text-emerald-600" },
+                    { label: "Total Expenses", value: totalExpenses, color: "text-rose-600" },
+                    { label: "Net Profit", value: netProfit, color: netProfit >= 0 ? "text-emerald-600" : "text-rose-600" },
+                  ].map(({ label, value, color }) => (
+                    <div key={label} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                      <div className="text-sm text-slate-500 mb-2">{label}</div>
+                      <div className={`text-3xl font-extrabold ${color}`}>${value.toLocaleString()}</div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm mb-6">
+                  <h2 className="text-lg font-semibold text-slate-900 mb-4">Add Transaction</h2>
+                  <form onSubmit={addTransaction} noValidate>
+                    <div className="grid gap-4 mb-4 sm:grid-cols-2 xl:grid-cols-3">
+                      <div>
+                        <label htmlFor="tx-date" className={labelClass}>Date *</label>
+                        <input
+                          id="tx-date"
+                          className={inputClass}
+                          type="date"
+                          value={newTransaction.date}
+                          onChange={(e) => setNewTransaction({ ...newTransaction, date: e.target.value })}
+                          required
+                          aria-required="true"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="tx-type" className={labelClass}>Type</label>
+                        <select
+                          id="tx-type"
+                          className={inputClass}
+                          value={newTransaction.type}
+                          onChange={(e) => setNewTransaction({ ...newTransaction, type: e.target.value })}
+                        >
+                          <option value="Income">Income</option>
+                          <option value="Expense">Expense</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label htmlFor="tx-amount" className={labelClass}>Amount ($) *</label>
+                        <input
+                          id="tx-amount"
+                          className={inputClass}
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          placeholder="0.00"
+                          value={newTransaction.amount}
+                          onChange={(e) => setNewTransaction({ ...newTransaction, amount: Number(e.target.value) })}
+                          required
+                          aria-required="true"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="tx-tenant" className={labelClass}>Tenant</label>
+                        <input
+                          id="tx-tenant"
+                          className={inputClass}
+                          placeholder="Optional"
+                          value={newTransaction.tenant}
+                          onChange={(e) => setNewTransaction({ ...newTransaction, tenant: e.target.value })}
+                          maxLength={255}
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="tx-property" className={labelClass}>Property</label>
+                        <input
+                          id="tx-property"
+                          className={inputClass}
+                          placeholder="Optional"
+                          value={newTransaction.property}
+                          onChange={(e) => setNewTransaction({ ...newTransaction, property: e.target.value })}
+                          maxLength={255}
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="tx-method" className={labelClass}>Payment Method</label>
+                        <input
+                          id="tx-method"
+                          className={inputClass}
+                          placeholder="e.g. Check, ACH"
+                          value={newTransaction.method}
+                          onChange={(e) => setNewTransaction({ ...newTransaction, method: e.target.value })}
+                          maxLength={100}
+                        />
+                      </div>
+                    </div>
+                    <FormMessage {...txMsg} />
+                    <button
+                      type="submit"
+                      disabled={txSubmitting}
+                      className="mt-3 px-5 py-2.5 rounded-lg bg-gradient-to-r from-orange-500 to-red-500 text-white text-sm font-semibold hover:shadow-md active:scale-95 transition disabled:opacity-60 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-orange-300"
+                    >
+                      {txSubmitting ? "Saving…" : "Save Entry"}
+                    </button>
+                  </form>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                  <h2 className="text-lg font-semibold text-slate-900 mb-4">Transactions</h2>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm" aria-label="Transactions">
+                      <thead>
+                        <tr className="border-b border-slate-200">
+                          <th scope="col" className="text-left py-3 px-4 font-semibold text-slate-600">Date</th>
+                          <th scope="col" className="text-left py-3 px-4 font-semibold text-slate-600">Type</th>
+                          <th scope="col" className="text-left py-3 px-4 font-semibold text-slate-600">Amount</th>
+                          <th scope="col" className="text-left py-3 px-4 font-semibold text-slate-600">Tenant</th>
+                          <th scope="col" className="text-left py-3 px-4 font-semibold text-slate-600">Property</th>
+                          <th scope="col" className="text-left py-3 px-4 font-semibold text-slate-600">Method</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {transactions.map((tx) => (
+                          <tr key={tx.id} className="border-b border-slate-100 hover:bg-slate-50 transition">
+                            <td className="py-3 px-4 text-slate-700">{tx.date}</td>
+                            <td className="py-3 px-4">
+                              <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${tx.type === "Income" ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"}`}>
+                                {tx.type}
+                              </span>
+                            </td>
+                            <td className={`py-3 px-4 text-sm font-semibold ${tx.type === "Income" ? "text-emerald-600" : "text-rose-600"}`}>
+                              ${Number(tx.amount).toLocaleString()}
+                            </td>
+                            <td className="py-3 px-4 text-slate-600">{tx.tenant || "—"}</td>
+                            <td className="py-3 px-4 text-slate-600">{tx.property || "—"}</td>
+                            <td className="py-3 px-4 text-slate-600">{tx.method || "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {!dataLoading && transactions.length === 0 && (
+                      <p className="text-center py-12 text-slate-400 text-sm">No transactions yet. Add your first entry above.</p>
+                    )}
                   </div>
+                </div>
+              </>
+            )}
+
+            {/* REPORTS */}
+            {!activeUnimplemented && activeModule === "Reports" && (
+              <>
+                <h1 className="text-3xl font-bold text-slate-900 mb-6">Reports</h1>
+                <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm max-w-lg">
+                  <h2 className="text-lg font-semibold text-slate-900 mb-4">Portfolio Summary</h2>
+                  <dl className="space-y-3 text-sm text-slate-700">
+                    {[
+                      { label: "Total Properties", value: properties.length },
+                      { label: "Total Tenants", value: tenants.length },
+                      { label: "Total Income", value: `$${totalIncome.toLocaleString()}` },
+                      { label: "Total Expenses", value: `$${totalExpenses.toLocaleString()}` },
+                      { label: "Net Profit", value: `$${netProfit.toLocaleString()}` },
+                    ].map(({ label, value }) => (
+                      <div key={label} className="flex justify-between py-2 border-b border-slate-100 last:border-0">
+                        <dt className="text-slate-500">{label}</dt>
+                        <dd className="font-semibold text-slate-900">{value}</dd>
+                      </div>
+                    ))}
+                  </dl>
                 </div>
               </>
             )}
@@ -713,44 +925,25 @@ function Dashboard() {
 
 function getSidebarIcon(item: string) {
   switch (item) {
-    case "Home":
-      return "⌂";
-    case "To Do":
-      return "☑";
-    case "History":
-      return "◷";
-    case "Tenants":
-      return "◌";
-    case "Maintenance":
-      return "⚒";
-    case "Inventory":
-      return "▣";
-    case "Time Cards":
-      return "◔";
-    case "Reports":
-      return "△";
-    case "Accounting":
-      return "$";
-    case "Properties":
-      return "▤";
-    case "Projects":
-      return "▥";
-    case "Marketing":
-      return "⟡";
-    case "Legal":
-      return "⚖";
-    case "Finance":
-      return "▥";
-    case "Calendar":
-      return "☷";
-    case "Complaints":
-      return "◫";
-    case "Analytics":
-      return "◔";
-    case "IT":
-      return "▭";
-    default:
-      return "•";
+    case "Home":       return "⌂";
+    case "To Do":      return "☑";
+    case "History":    return "◷";
+    case "Tenants":    return "◌";
+    case "Maintenance":return "⚒";
+    case "Inventory":  return "▣";
+    case "Time Cards": return "◔";
+    case "Reports":    return "△";
+    case "Accounting": return "$";
+    case "Properties": return "▤";
+    case "Projects":   return "▥";
+    case "Marketing":  return "⟡";
+    case "Legal":      return "⚖";
+    case "Finance":    return "▥";
+    case "Calendar":   return "☷";
+    case "Complaints": return "◫";
+    case "Analytics":  return "◔";
+    case "IT":         return "▭";
+    default:           return "•";
   }
 }
 
