@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { validateWorkOrder, sanitizeName, sanitizeDate, sanitizeString } from "@/lib/validation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,14 +34,32 @@ export default function Maintenance() {
 
   const addOrder = useMutation({
     mutationFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-      const { error } = await supabase.from("work_orders").insert({
-        ...form,
-        due_date: form.due_date || null,
-        user_id: user.id,
-      });
-      if (error) throw error;
+      // Validate form input before sending to database
+      try {
+        const validated = validateWorkOrder({
+          title: form.issue,
+          description: (form.property || "") + " - " + (form.unit || ""),
+          status: form.status,
+          priority: form.priority,
+        });
+
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error("Not authenticated");
+        
+        const { error } = await supabase.from("work_orders").insert({
+          property: sanitizeName(form.property, "Property"),
+          unit: sanitizeName(form.unit, "Unit"),
+          issue: validated.title,
+          priority: validated.priority,
+          status: validated.status,
+          assigned_to: sanitizeString(form.assigned_to, 100) || null,
+          due_date: form.due_date ? sanitizeDate(form.due_date) : null,
+          user_id: user.id,
+        });
+        if (error) throw error;
+      } catch (e: any) {
+        throw new Error(e.message || "Validation failed");
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["work_orders"] });
@@ -48,7 +67,10 @@ export default function Maintenance() {
       setOpen(false);
       toast.success("Work order created");
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e: any) => {
+      console.error("❌ Work order error:", e.message);
+      toast.error(e.message || "Failed to create work order");
+    },
   });
 
   const filtered = orders.filter((o) =>

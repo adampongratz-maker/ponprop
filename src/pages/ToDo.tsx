@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { validateTask, sanitizeName, validateEnumValue, ALLOWED_VALUES } from "@/lib/validation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,9 +28,22 @@ export default function ToDo() {
 
   const addTask = useMutation({
     mutationFn: async () => {
+      // Validate input before sending to database
+      const validated = validateTask({
+        text: newTask,
+        priority: priority,
+        status: "Open",
+      });
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
-      const { error } = await supabase.from("tasks").insert({ text: newTask, priority, user_id: user.id });
+      
+      const { error } = await supabase.from("tasks").insert({
+        text: validated.text,
+        priority: validated.priority,
+        status: validated.status,
+        user_id: user.id,
+      });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -37,12 +51,20 @@ export default function ToDo() {
       setNewTask("");
       toast.success("Task added");
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e: any) => {
+      console.error("❌ Task error:", e.message);
+      toast.error(e.message || "Failed to add task");
+    },
   });
 
   const toggleTask = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const newStatus = status === "Completed" ? "Open" : "Completed";
+      // Validate ID and status
+      const newStatus = validateEnumValue(
+        status === "Completed" ? "Open" : "Completed",
+        ALLOWED_VALUES.TASK_STATUS,
+        "Status"
+      );
       const { error } = await supabase.from("tasks").update({
         status: newStatus,
         completed_at: newStatus === "Completed" ? new Date().toISOString() : null,

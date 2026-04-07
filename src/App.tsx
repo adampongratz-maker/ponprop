@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
 import { supabase } from "./lib/supabase";
+import { validateProperty, validateTenant, validateTransaction, sanitizeString } from "./lib/validation";
 import AuthPage from "./pages/AuthPage";
 import Privacy from "./pages/Privacy";
 
@@ -161,71 +162,99 @@ function Dashboard() {
   const netProfit = totalIncome - totalExpenses;
 
   async function addProperty() {
-    if (!newProperty.name || !newProperty.address) return;
-
     try {
-      const { data, error } = await supabase.from("properties").insert([newProperty]);
+      // Validate input before sending to database
+      const validated = validateProperty({
+        name: newProperty.name,
+        address: newProperty.address,
+        units: newProperty.units,
+        status: newProperty.status,
+      });
+
+      const { data, error } = await supabase.from("properties").insert([validated]);
       if (error) {
-        console.error("Failed to add property", error);
+        console.error("❌ Failed to add property", error);
+        // Show generic error to user, keep detailed error in console
+        alert("Failed to add property. Please try again.");
         return;
       }
 
       setNewProperty({ name: "", address: "", units: 1, status: "Active" });
       loadAllData();
-    } catch (e) {
-      console.error("Unexpected error adding property", e);
+    } catch (e: any) {
+      console.error("❌ Property validation error:", e.message);
+      // Show validation error to user
+      alert("Invalid property data: " + e.message);
     }
   }
 
   async function addTenant() {
-    if (!newTenant.name || !newTenant.unit) return;
-
     try {
-      const { data, error } = await supabase.from("tenants").insert([newTenant]);
+      // Validate input before sending to database
+      const validated = validateTenant({
+        name: newTenant.name,
+        unit: newTenant.unit,
+        rent: newTenant.rent,
+        status: newTenant.status,
+      });
+
+      const { data, error } = await supabase.from("tenants").insert([validated]);
       if (error) {
-        console.error("Failed to add tenant", error);
+        console.error("❌ Failed to add tenant", error);
+        alert("Failed to add tenant. Please try again.");
         return;
       }
 
       setNewTenant({ name: "", unit: "", rent: 0, status: "Active" });
       loadAllData();
-    } catch (e) {
-      console.error("Unexpected error adding tenant", e);
+    } catch (e: any) {
+      console.error("❌ Tenant validation error:", e.message);
+      alert("Invalid tenant data: " + e.message);
     }
   }
 
   async function addTransaction() {
-    if (!newTransaction.date || !newTransaction.description || !newTransaction.category) return;
-
     try {
-      const { data, error } = await supabase.from("transactions").insert([newTransaction]);
+      // Validate input before sending to database
+      const validated = validateTransaction({
+        date: newTransaction.date,
+        description: newTransaction.description,
+        type: newTransaction.type,
+        amount: newTransaction.amount,
+        category: newTransaction.category,
+      });
+
+      const { data, error } = await supabase.from("transactions").insert([validated]);
       if (error) {
-        console.error("Failed to add transaction", error);
+        console.error("❌ Failed to add transaction", error);
+        alert("Failed to add transaction. Please try again.");
         return;
       }
 
       setNewTransaction({ date: "", description: "", type: "income", amount: 0, category: "" });
       loadAllData();
-    } catch (e) {
-      console.error("Unexpected error adding transaction", e);
+    } catch (e: any) {
+      console.error("❌ Transaction validation error:", e.message);
+      alert("Invalid transaction data: " + e.message);
     }
   }
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 p-1 box-border">
-      <div className="grid min-h-[calc(100vh-8px)] grid-cols-1 lg:grid-cols-[320px_1fr] rounded-[18px] overflow-hidden border border-slate-200 bg-white">
+      <div className="grid min-h-[calc(100vh-8px)] grid-cols-1 lg:grid-cols-[280px_1fr] rounded-2xl overflow-hidden border border-slate-200 bg-white shadow-sm">
 
-        <aside className="flex flex-col bg-slate-50 border-b border-slate-200 lg:border-b-0 lg:border-r lg:bg-slate-50 h-full">
-          <div className="flex items-center gap-4 border-b border-slate-200 bg-white px-5 py-5">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-700 text-white text-xl font-bold">
+        <aside className="flex flex-col bg-gradient-to-b from-slate-50 to-white border-b border-slate-200 lg:border-b-0 lg:border-r h-full">
+          <div className="flex items-center gap-3 border-b border-slate-200 bg-white px-5 py-4">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-sky-600 to-blue-600 text-white font-bold">
               ▤
             </div>
-            <div>
-              <div className="text-base font-semibold text-slate-900">Pongratz Properties</div>
+            <div className="flex-1">
+              <div className="text-sm font-bold text-slate-900">PonProp</div>
+              <div className="text-xs text-slate-500">Property Mgmt</div>
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-3 py-4">
+          <div className="flex-1 overflow-y-auto px-2 py-3 space-y-1">
             {sidebarItems.map((item) => {
               const isActive = item === activeModule;
               return (
@@ -243,54 +272,53 @@ function Dashboard() {
                       setActiveModule(item as ModuleKey);
                     }
                   }}
-                  className={`flex w-full items-center gap-4 rounded-2xl px-4 py-3 mb-1 text-left text-sm font-medium transition duration-200 ${
-                    isActive ? "bg-slate-200 text-sky-700" : "text-slate-700 hover:bg-slate-100"
+                  className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-medium transition duration-200 ${
+                    isActive 
+                      ? "bg-gradient-to-r from-sky-100 to-blue-100 text-sky-700 shadow-sm" 
+                      : "text-slate-600 hover:bg-slate-100"
                   }`}
                   style={{ cursor: "pointer", border: "none" }}
                 >
-                  <span style={{ width: "18px", textAlign: "center", fontSize: "18px" }}>
+                  <span style={{ width: "16px", textAlign: "center", fontSize: "16px" }}>
                     {getSidebarIcon(item)}
                   </span>
-                  <span>{item}</span>
+                  <span className="flex-1">{item}</span>
+                  {isActive && <span className="text-sky-600">●</span>}
                 </button>
               );
             })}
           </div>
         </aside>
 
-        <main className="flex min-w-0 flex-col bg-slate-100 h-full">
-          <div className="flex h-16 items-center justify-between gap-5 border-b border-slate-200 bg-slate-50 px-5">
-            <div className="flex items-center gap-4 text-slate-800">
-              <div className="text-2xl">◫</div>
-              <div className="text-xl font-semibold">Pongratz Properties</div>
+        <main className="flex min-w-0 flex-col bg-gradient-to-br from-slate-50 to-slate-100 h-full">
+          <div className="flex h-14 items-center justify-between gap-4 border-b border-slate-200 bg-white px-6 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="text-xl font-bold text-slate-900">PonProp Dashboard</div>
             </div>
 
-            <div className="flex items-center gap-4">
-              <div className="flex w-[320px] max-w-[32vw] items-center gap-3 rounded-full border border-slate-200 bg-slate-100 px-4 py-3 text-sm text-slate-500">
-                <span className="text-base">⌕</span>
-                <span>Search...</span>
-              </div>
-              <div className="relative text-2xl text-slate-600">
-                ⍾
-                <span className="absolute -right-1 top-0 h-2.5 w-2.5 rounded-full bg-sky-700 ring-2 ring-slate-50" />
-              </div>
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-sky-100 text-sky-700 font-semibold">
+            <div className="flex items-center gap-3">
+              <button className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-100 transition">
+                <span>⋮</span>
+              </button>
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-sky-500 to-blue-600 text-white font-semibold text-xs">
                 PP
               </div>
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-7">
+          <div className="flex-1 overflow-y-auto p-6">
             {loading && <div style={{ marginBottom: "16px" }}>Loading...</div>}
 
             {activeModule === "Home" && (
               <>
-                <div className="text-5xl font-extrabold tracking-tight text-slate-900 sm:text-6xl mb-3">
-                  Welcome back <span className="text-4xl">👋</span>
+                <div className="mb-2">
+                  <h1 className="text-4xl font-bold tracking-tight text-slate-900">
+                    Welcome back 👋
+                  </h1>
+                  <p className="text-slate-600 mt-2">Manage all your properties in one place</p>
                 </div>
-                <div className="text-lg text-slate-600 mb-9">Manage your properties from one place.</div>
 
-                <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 mt-8">
                   {appItems.map((item) => (
                     <button
                       key={item.name}
@@ -306,41 +334,28 @@ function Dashboard() {
                           setActiveModule(item.name as ModuleKey);
                         }
                       }}
-                      className="group rounded-[22px] border border-slate-200 bg-slate-50 min-h-[154px] p-0 text-center transition duration-200 hover:-translate-y-1 hover:shadow-lg"
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
+                      className="group rounded-2xl border border-slate-200 bg-white min-h-[140px] p-5 text-left transition duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:border-slate-300"
                     >
                       <div
                         style={{
-                          width: "80px",
-                          height: "80px",
-                          borderRadius: "22px",
+                          width: "56px",
+                          height: "56px",
+                          borderRadius: "14px",
                           background: item.color,
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
                           color: "#ffffff",
-                          fontSize: "40px",
+                          fontSize: "28px",
                           fontWeight: 700,
-                          marginBottom: "14px",
-                          boxShadow: "0 10px 20px rgba(0,0,0,0.08)",
+                          marginBottom: "10px",
+                          boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
                         }}
                       >
                         {item.icon}
                       </div>
 
-                      <div
-                        style={{
-                          fontSize: "16px",
-                          fontWeight: 700,
-                          color: "#1f2937",
-                          textAlign: "center",
-                        }}
-                      >
+                      <div className="text-sm font-semibold text-slate-900 group-hover:text-slate-700">
                         {item.name}
                       </div>
                     </button>
@@ -351,64 +366,77 @@ function Dashboard() {
 
             {activeModule === "Properties" && (
               <>
-                <h1 className="text-2xl font-semibold text-slate-900 mb-4">Properties</h1>
+                <h1 className="text-3xl font-bold text-slate-900 mb-6 flex items-center gap-3">
+                  <span>▤</span> Properties
+                </h1>
 
-                <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm mb-8">
-                  <h3 className="text-lg font-semibold text-slate-900 mb-4">Add Property</h3>
-                  <div className="grid gap-3 mb-3.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
+                <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm mb-6">
+                  <h3 className="text-lg font-semibold text-slate-900 mb-4">Add New Property</h3>
+                  <div className="grid gap-3 mb-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))" }}>
                     <input
-                      className="px-3.5 py-3 rounded-3xl border border-slate-200 bg-white"
+                      className="px-3 py-2.5 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
                       placeholder="Property Name"
                       value={newProperty.name}
                       onChange={(e) => setNewProperty({ ...newProperty, name: e.target.value })}
                     />
                     <input
-                      className="px-3.5 py-3 rounded-3xl border border-slate-200 bg-white"
+                      className="px-3 py-2.5 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
                       placeholder="Address"
                       value={newProperty.address}
                       onChange={(e) => setNewProperty({ ...newProperty, address: e.target.value })}
                     />
                     <input
-                      className="px-3.5 py-3 rounded-3xl border border-slate-200 bg-white"
+                      className="px-3 py-2.5 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
                       type="number"
                       placeholder="Units"
                       value={newProperty.units}
                       onChange={(e) => setNewProperty({ ...newProperty, units: Number(e.target.value) })}
                     />
                     <input
-                      className="px-3.5 py-3 rounded-3xl border border-slate-200 bg-white"
+                      className="px-3 py-2.5 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
                       placeholder="Status"
                       value={newProperty.status}
                       onChange={(e) => setNewProperty({ ...newProperty, status: e.target.value })}
                     />
                   </div>
-                  <button className="px-4 py-3 rounded-3xl bg-sky-600 text-white font-semibold hover:bg-sky-700 transition" onClick={addProperty}>
-                    Save Property
+                  <button className="px-4 py-2.5 rounded-lg bg-gradient-to-r from-sky-600 to-blue-600 text-white text-sm font-semibold hover:shadow-md active:scale-95 transition" onClick={addProperty}>
+                    + Add Property
                   </button>
                 </div>
 
-                <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                   <h3 className="text-lg font-semibold text-slate-900 mb-4">Property List</h3>
-                  <table className="min-w-full border-collapse">
-                    <thead>
-                      <tr className="text-left text-sm text-slate-600">
-                        <th className="pb-3 pr-6">Name</th>
-                        <th className="pb-3 pr-6">Address</th>
-                        <th className="pb-3 pr-6">Units</th>
-                        <th className="pb-3">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {properties.map((property) => (
-                        <tr key={property.id} className="border-t border-slate-200">
-                          <td className="py-4 pr-6 text-sm text-slate-700">{property.name}</td>
-                          <td className="py-4 pr-6 text-sm text-slate-700">{property.address}</td>
-                          <td className="py-4 pr-6 text-sm text-slate-700">{property.units}</td>
-                          <td className="py-4 text-sm text-slate-700">{property.status}</td>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-200">
+                          <th className="text-left py-3 px-4 font-semibold text-slate-600">Name</th>
+                          <th className="text-left py-3 px-4 font-semibold text-slate-600">Address</th>
+                          <th className="text-left py-3 px-4 font-semibold text-slate-600">Units</th>
+                          <th className="text-left py-3 px-4 font-semibold text-slate-600">Status</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {properties.map((property) => (
+                          <tr key={property.id} className="border-b border-slate-100 hover:bg-slate-50 transition">
+                            <td className="py-3 px-4 text-slate-900">{property.name}</td>
+                            <td className="py-3 px-4 text-slate-600">{property.address}</td>
+                            <td className="py-3 px-4 text-slate-600">{property.units}</td>
+                            <td className="py-3 px-4">
+                              <span className="px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+                                {property.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {properties.length === 0 && (
+                      <div className="text-center py-12 text-slate-500">
+                        No properties yet. Add your first property above.
+                      </div>
+                    )}
+                  </div>
                 </div>
               </>
             )}
