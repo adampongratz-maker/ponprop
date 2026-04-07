@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "./lib/supabase";
-import { validateProperty, validateTenant, validateTransaction, sanitizeString } from "./lib/validation";
+import { validateProperty, validateTenant } from "./lib/validation";
 import AuthPage from "./pages/AuthPage";
 import Privacy from "./pages/Privacy";
 
@@ -29,13 +29,16 @@ type TenantRow = {
   status: string;
 };
 
-type TransactionRow = {
+type LedgerRow = {
   id: string;
   date: string;
-  description: string;
-  type: "income" | "expense";
+  type: string;
   amount: number;
-  category: string;
+  tenant: string | null;
+  property: string | null;
+  unit: string | null;
+  method: string | null;
+  user_id: string;
 };
 
 const sidebarItems = [
@@ -119,7 +122,7 @@ function Dashboard() {
 
   const [properties, setProperties] = useState<PropertyRow[]>([]);
   const [tenants, setTenants] = useState<TenantRow[]>([]);
-  const [transactions, setTransactions] = useState<TransactionRow[]>([]);
+  const [transactions, setTransactions] = useState<LedgerRow[]>([]);
 
   const [newProperty, setNewProperty] = useState({
     name: "",
@@ -131,16 +134,17 @@ function Dashboard() {
   const [newTenant, setNewTenant] = useState({
     name: "",
     unit: "",
-    rent: 0,
+    balance: 0,
     status: "Active",
   });
 
   const [newTransaction, setNewTransaction] = useState({
     date: "",
-    description: "",
-    type: "income" as "income" | "expense",
+    type: "Income",
     amount: 0,
-    category: "",
+    tenant: "",
+    property: "",
+    method: "",
   });
 
   async function loadAllData() {
@@ -150,7 +154,7 @@ function Dashboard() {
       const [propRes, tenantRes, transRes] = await Promise.all([
         supabase.from("properties").select("*").order("created_at", { ascending: false }),
         supabase.from("tenants").select("*").order("created_at", { ascending: false }),
-        supabase.from("transactions").select("*").order("date", { ascending: false }),
+        supabase.from("ledger_entries").select("*").order("date", { ascending: false }),
       ]);
 
       if (propRes.error || tenantRes.error || transRes.error) {
@@ -164,7 +168,7 @@ function Dashboard() {
 
       setProperties((propRes.data as PropertyRow[]) || []);
       setTenants((tenantRes.data as TenantRow[]) || []);
-      setTransactions((transRes.data as TransactionRow[]) || []);
+      setTransactions((transRes.data as LedgerRow[]) || []);
     } catch (e) {
       console.error("Unexpected error loading data", e);
     } finally {
@@ -187,7 +191,7 @@ function Dashboard() {
   const totalIncome = useMemo(
     () =>
       transactions
-        .filter((t) => t.type === "income")
+        .filter((t) => t.type === "Income")
         .reduce((sum, t) => sum + Number(t.amount), 0),
     [transactions]
   );
@@ -195,7 +199,7 @@ function Dashboard() {
   const totalExpenses = useMemo(
     () =>
       transactions
-        .filter((t) => t.type === "expense")
+        .filter((t) => t.type === "Expense")
         .reduce((sum, t) => sum + Number(t.amount), 0),
     [transactions]
   );
@@ -235,18 +239,21 @@ function Dashboard() {
       const validated = validateTenant({
         name: newTenant.name,
         unit: newTenant.unit,
-        rent: newTenant.rent,
+        balance: newTenant.balance,
         status: newTenant.status,
       });
 
-      const { data, error } = await supabase.from("tenants").insert([validated]);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { alert("Not authenticated"); return; }
+
+      const { data, error } = await supabase.from("tenants").insert([{ ...validated, user_id: user.id }]);
       if (error) {
         console.error("❌ Failed to add tenant", error);
         alert("Failed to add tenant. Please try again.");
         return;
       }
 
-      setNewTenant({ name: "", unit: "", rent: 0, status: "Active" });
+      setNewTenant({ name: "", unit: "", balance: 0, status: "Active" });
       loadAllData();
     } catch (e: any) {
       console.error("❌ Tenant validation error:", e.message);
@@ -256,27 +263,32 @@ function Dashboard() {
 
   async function addTransaction() {
     try {
-      // Validate input before sending to database
-      const validated = validateTransaction({
-        date: newTransaction.date,
-        description: newTransaction.description,
-        type: newTransaction.type,
-        amount: newTransaction.amount,
-        category: newTransaction.category,
-      });
+      if (!newTransaction.date) { alert("Date is required."); return; }
+      if (!newTransaction.amount) { alert("Amount is required."); return; }
 
-      const { data, error } = await supabase.from("transactions").insert([validated]);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { alert("Not authenticated"); return; }
+
+      const { error } = await supabase.from("ledger_entries").insert([{
+        user_id: user.id,
+        date: newTransaction.date,
+        type: newTransaction.type,
+        amount: Number(newTransaction.amount),
+        tenant: newTransaction.tenant.trim() || null,
+        property: newTransaction.property.trim() || null,
+        method: newTransaction.method.trim() || null,
+      }]);
       if (error) {
-        console.error("❌ Failed to add transaction", error);
-        alert("Failed to add transaction. Please try again.");
+        console.error("❌ Failed to add ledger entry", error);
+        alert("Failed to add entry. Please try again.");
         return;
       }
 
-      setNewTransaction({ date: "", description: "", type: "income", amount: 0, category: "" });
+      setNewTransaction({ date: "", type: "Income", amount: 0, tenant: "", property: "", method: "" });
       loadAllData();
     } catch (e: any) {
-      console.error("❌ Transaction validation error:", e.message);
-      alert("Invalid transaction data: " + e.message);
+      console.error("❌ Ledger entry error:", e.message);
+      alert("Error: " + e.message);
     }
   }
 
@@ -525,10 +537,10 @@ function Dashboard() {
                     <input
                       className="px-3.5 py-3 rounded-3xl border border-slate-200 bg-white"
                       type="number"
-                      placeholder="Rent"
-                      value={newTenant.rent}
+                      placeholder="Balance"
+                      value={newTenant.balance}
                       onChange={(e) =>
-                        setNewTenant({ ...newTenant, rent: Number(e.target.value) })
+                        setNewTenant({ ...newTenant, balance: Number(e.target.value) })
                       }
                     />
                     <input
@@ -559,7 +571,7 @@ function Dashboard() {
                         <tr key={tenant.id} className="border-t border-slate-200">
                           <td className="py-4 pr-6 text-sm text-slate-700">{tenant.name}</td>
                           <td className="py-4 pr-6 text-sm text-slate-700">{tenant.unit}</td>
-                          <td className="py-4 pr-6 text-sm text-slate-700">${tenant.rent}</td>
+                          <td className="py-4 pr-6 text-sm text-slate-700">${tenant.balance ?? 0}</td>
                           <td className="py-4 text-sm text-slate-700">{tenant.status}</td>
                         </tr>
                       ))}
@@ -599,46 +611,42 @@ function Dashboard() {
                       value={newTransaction.date}
                       onChange={(e) => setNewTransaction({ ...newTransaction, date: e.target.value })}
                     />
-                    <input
-                      className="px-3.5 py-3 rounded-3xl border border-slate-200 bg-white"
-                      placeholder="Description"
-                      value={newTransaction.description}
-                      onChange={(e) => setNewTransaction({ ...newTransaction, description: e.target.value })}
-                    />
                     <select
                       className="px-3.5 py-3 rounded-3xl border border-slate-200 bg-white"
                       value={newTransaction.type}
-                      onChange={(e) =>
-                        setNewTransaction({
-                          ...newTransaction,
-                          type: e.target.value as "income" | "expense",
-                        })
-                      }
+                      onChange={(e) => setNewTransaction({ ...newTransaction, type: e.target.value })}
                     >
-                      <option value="income">Income</option>
-                      <option value="expense">Expense</option>
+                      <option value="Income">Income</option>
+                      <option value="Expense">Expense</option>
                     </select>
                     <input
                       className="px-3.5 py-3 rounded-3xl border border-slate-200 bg-white"
                       type="number"
                       placeholder="Amount"
                       value={newTransaction.amount}
-                      onChange={(e) =>
-                        setNewTransaction({
-                          ...newTransaction,
-                          amount: Number(e.target.value),
-                        })
-                      }
+                      onChange={(e) => setNewTransaction({ ...newTransaction, amount: Number(e.target.value) })}
                     />
                     <input
                       className="px-3.5 py-3 rounded-3xl border border-slate-200 bg-white"
-                      placeholder="Category"
-                      value={newTransaction.category}
-                      onChange={(e) => setNewTransaction({ ...newTransaction, category: e.target.value })}
+                      placeholder="Tenant"
+                      value={newTransaction.tenant}
+                      onChange={(e) => setNewTransaction({ ...newTransaction, tenant: e.target.value })}
+                    />
+                    <input
+                      className="px-3.5 py-3 rounded-3xl border border-slate-200 bg-white"
+                      placeholder="Property"
+                      value={newTransaction.property}
+                      onChange={(e) => setNewTransaction({ ...newTransaction, property: e.target.value })}
+                    />
+                    <input
+                      className="px-3.5 py-3 rounded-3xl border border-slate-200 bg-white"
+                      placeholder="Payment method"
+                      value={newTransaction.method}
+                      onChange={(e) => setNewTransaction({ ...newTransaction, method: e.target.value })}
                     />
                   </div>
                   <button className="px-4 py-3 rounded-3xl bg-sky-600 text-white font-semibold hover:bg-sky-700 transition" onClick={addTransaction}>
-                    Save Transaction
+                    Save Entry
                   </button>
                 </div>
 
@@ -648,20 +656,22 @@ function Dashboard() {
                     <thead>
                       <tr className="text-left text-sm text-slate-600">
                         <th className="pb-3 pr-6">Date</th>
-                        <th className="pb-3 pr-6">Description</th>
                         <th className="pb-3 pr-6">Type</th>
-                        <th className="pb-3 pr-6">Category</th>
-                        <th className="pb-3">Amount</th>
+                        <th className="pb-3 pr-6">Amount</th>
+                        <th className="pb-3 pr-6">Tenant</th>
+                        <th className="pb-3 pr-6">Property</th>
+                        <th className="pb-3">Method</th>
                       </tr>
                     </thead>
                     <tbody>
                       {transactions.map((transaction) => (
                         <tr key={transaction.id} className="border-t border-slate-200">
                           <td className="py-4 pr-6 text-sm text-slate-700">{transaction.date}</td>
-                          <td className="py-4 pr-6 text-sm text-slate-700">{transaction.description}</td>
                           <td className="py-4 pr-6 text-sm text-slate-700">{transaction.type}</td>
-                          <td className="py-4 pr-6 text-sm text-slate-700">{transaction.category}</td>
-                          <td className="py-4 text-sm text-slate-700">${transaction.amount}</td>
+                          <td className={`py-4 pr-6 text-sm font-medium ${transaction.type === "Income" ? "text-emerald-600" : "text-rose-600"}`}>${Number(transaction.amount).toLocaleString()}</td>
+                          <td className="py-4 pr-6 text-sm text-slate-700">{transaction.tenant || "—"}</td>
+                          <td className="py-4 pr-6 text-sm text-slate-700">{transaction.property || "—"}</td>
+                          <td className="py-4 text-sm text-slate-700">{transaction.method || "—"}</td>
                         </tr>
                       ))}
                     </tbody>

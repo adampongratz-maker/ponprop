@@ -14,6 +14,81 @@ export type Database = {
   }
   public: {
     Tables: {
+      calendar_events: {
+        Row: {
+          created_at: string
+          date: string
+          id: string
+          notes: string | null
+          property: string | null
+          status: string
+          time: string | null
+          title: string
+          type: string
+          unit: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          id?: string
+          notes?: string | null
+          property?: string | null
+          status?: string
+          time?: string | null
+          title: string
+          type?: string
+          unit?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          id?: string
+          notes?: string | null
+          property?: string | null
+          status?: string
+          time?: string | null
+          title?: string
+          type?: string
+          unit?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      inventory_items: {
+        Row: {
+          category: string | null
+          created_at: string
+          id: string
+          location: string | null
+          name: string
+          qty: number
+          reorder_at: number
+          user_id: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          id?: string
+          location?: string | null
+          name: string
+          qty?: number
+          reorder_at?: number
+          user_id: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          id?: string
+          location?: string | null
+          name?: string
+          qty?: number
+          reorder_at?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       ledger_entries: {
         Row: {
           amount: number
@@ -238,6 +313,135 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      properties: {
+        Row: {
+          address: string | null
+          created_at: string
+          id: string
+          name: string
+          status: string
+          units: number
+          user_id: string
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          status?: string
+          units?: number
+          user_id: string
+        }
+        Update: {
+          address?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          status?: string
+          units?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      property_units: {
+        Row: {
+          created_at: string
+          id: string
+          property_name: string
+          rent: number
+          status: string
+          tenant_name: string | null
+          unit_number: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          property_name: string
+          rent?: number
+          status?: string
+          tenant_name?: string | null
+          unit_number: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          property_name?: string
+          rent?: number
+          status?: string
+          tenant_name?: string | null
+          unit_number?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      projects: {
+        Row: {
+          budget: number
+          created_at: string
+          due_date: string | null
+          id: string
+          name: string
+          property: string
+          start_date: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          budget?: number
+          created_at?: string
+          due_date?: string | null
+          id?: string
+          name: string
+          property: string
+          start_date?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          budget?: number
+          created_at?: string
+          due_date?: string | null
+          id?: string
+          name?: string
+          property?: string
+          start_date?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      shopping_items: {
+        Row: {
+          created_at: string
+          done: boolean
+          id: string
+          name: string
+          qty: number
+          store: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          done?: boolean
+          id?: string
+          name: string
+          qty?: number
+          store?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          done?: boolean
+          id?: string
+          name?: string
+          qty?: number
+          store?: string | null
           user_id?: string
         }
         Relationships: []

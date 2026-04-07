@@ -32,7 +32,7 @@ export default function AuthPage() {
     if (!email.trim()) return "Email is required";
     if (!/^\S+@\S+\.\S+$/.test(email.trim())) return "Please enter a valid email address";
     if (!password.trim()) return "Password is required";
-    if (password.length < 6) return "Password must be at least 6 characters";
+    if (password.length < 8) return "Password must be at least 8 characters";
     return "";
   };
 
