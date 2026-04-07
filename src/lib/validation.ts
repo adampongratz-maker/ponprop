@@ -23,7 +23,7 @@ export const VALIDATION_LIMITS = {
 export const ALLOWED_VALUES = {
   PROPERTY_STATUS: ["Active", "Inactive", "Maintenance"],
   TENANT_STATUS: ["Active", "Inactive", "Evicted"],
-  TRANSACTION_TYPE: ["income", "expense"],
+  TRANSACTION_TYPE: ["Income", "Expense"],
   TASK_PRIORITY: ["Low", "Medium", "High"],
   TASK_STATUS: ["Open", "Completed", "Cancelled"],
   WORK_ORDER_STATUS: ["Open", "In Progress", "Completed"],
@@ -162,23 +162,31 @@ export function validateProperty(data: any) {
 export function validateTenant(data: any) {
   return {
     name: sanitizeName(data.name, "Tenant name"),
-    unit: sanitizeName(data.unit, "Unit"),
-    rent: sanitizeNumber(data.rent, 0, 1000000),
+    unit: sanitizeString(data.unit, VALIDATION_LIMITS.UNIT_MAX) || null,
+    balance: sanitizeNumber(data.balance ?? 0, 0, 1000000),
     status: validateEnumValue(data.status, ALLOWED_VALUES.TENANT_STATUS, "Status"),
   };
 }
 
 /**
- * Validates transaction data
+ * Validates a ledger entry (ledger_entries table).
+ * Replaces the old validateTransaction — type is "Income" or "Expense".
  */
-export function validateTransaction(data: any) {
+export function validateLedgerEntry(data: any) {
   return {
     date: sanitizeDate(data.date),
-    description: sanitizeName(data.description, "Description"),
     type: validateEnumValue(data.type, ALLOWED_VALUES.TRANSACTION_TYPE, "Type"),
     amount: sanitizeNumber(data.amount, 0, 1000000000),
-    category: sanitizeName(data.category, "Category"),
+    tenant: sanitizeString(data.tenant, VALIDATION_LIMITS.NAME_MAX) || null,
+    property: sanitizeString(data.property, VALIDATION_LIMITS.NAME_MAX) || null,
+    unit: sanitizeString(data.unit, VALIDATION_LIMITS.UNIT_MAX) || null,
+    method: sanitizeString(data.method, VALIDATION_LIMITS.NAME_MAX) || null,
   };
+}
+
+/** @deprecated Use validateLedgerEntry instead */
+export function validateTransaction(data: any) {
+  return validateLedgerEntry(data);
 }
 
 /**
