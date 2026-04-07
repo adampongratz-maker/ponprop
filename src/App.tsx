@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import type { User } from "@supabase/supabase-js";
 import { supabase } from "./lib/supabase";
 import { validateProperty, validateTenant, validateTransaction, sanitizeString } from "./lib/validation";
 import AuthPage from "./pages/AuthPage";
@@ -79,9 +80,41 @@ const appItems = [
   { name: "IT", icon: "▭", color: "linear-gradient(135deg, #5b8cff, #4b5df0)" },
 ];
 
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<User | null | undefined>(undefined);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (user === undefined) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-blue-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-sky-600" />
+          <p className="mt-3 text-slate-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (user === null) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <>{children}</>;
+}
+
 function Dashboard() {
   const navigate = useNavigate();
   const [activeModule, setActiveModule] = useState<ModuleKey>("Home");
+  const [authUser, setAuthUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(false);
 
   const [properties, setProperties] = useState<PropertyRow[]>([]);
@@ -141,6 +174,14 @@ function Dashboard() {
 
   useEffect(() => {
     loadAllData();
+  }, []);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => setAuthUser(user));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthUser(session?.user ?? null);
+    });
+    return () => subscription.unsubscribe();
   }, []);
 
   const totalIncome = useMemo(
@@ -297,12 +338,33 @@ function Dashboard() {
             </div>
 
             <div className="flex items-center gap-3">
-              <button className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-100 transition">
-                <span>⋮</span>
+              {authUser && (
+                <span className="hidden sm:block text-sm text-slate-600 font-medium truncate max-w-[160px]">
+                  {authUser.user_metadata?.full_name || authUser.user_metadata?.name || authUser.email}
+                </span>
+              )}
+              {authUser?.user_metadata?.avatar_url ? (
+                <img
+                  src={authUser.user_metadata.avatar_url}
+                  alt="Profile"
+                  className="h-8 w-8 rounded-full object-cover ring-2 ring-slate-200"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-sky-500 to-blue-600 text-white font-semibold text-xs">
+                  {authUser?.user_metadata?.full_name?.[0]?.toUpperCase() ||
+                    authUser?.email?.[0]?.toUpperCase() || "PP"}
+                </div>
+              )}
+              <button
+                onClick={async () => {
+                  await supabase.auth.signOut();
+                  navigate("/");
+                }}
+                className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 border border-slate-200 transition"
+              >
+                Sign Out
               </button>
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-sky-500 to-blue-600 text-white font-semibold text-xs">
-                PP
-              </div>
             </div>
           </div>
 
@@ -678,7 +740,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<AuthPage />} />
-        <Route path="/home" element={<Dashboard />} />
+        <Route path="/home" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/privacy" element={<Privacy />} />
       </Routes>
     </BrowserRouter>
