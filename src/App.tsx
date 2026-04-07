@@ -297,13 +297,22 @@ function Dashboard() {
       <div className="grid min-h-[calc(100vh-8px)] grid-cols-1 lg:grid-cols-[280px_1fr] rounded-2xl overflow-hidden border border-slate-200 bg-white shadow-sm">
 
         <aside className="flex flex-col bg-gradient-to-b from-slate-50 to-white border-b border-slate-200 lg:border-b-0 lg:border-r h-full">
-          <div className="flex items-center gap-3 border-b border-slate-200 bg-white px-5 py-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-sky-600 to-blue-600 text-white font-bold">
-              ▤
-            </div>
-            <div className="flex-1">
-              <div className="text-sm font-bold text-slate-900">PonProp</div>
-              <div className="text-xs text-slate-500">Property Mgmt</div>
+          <div
+            className="flex items-center gap-3 border-b border-slate-200 bg-white px-5 py-4"
+            style={{ cursor: "pointer" }}
+            onClick={() => navigate("/")}
+          >
+            <img
+              src="/logo.png"
+              alt="PonProp Logo"
+              style={{ height: "32px", width: "auto", objectFit: "contain" }}
+              onError={(event) => {
+                (event.currentTarget as HTMLImageElement).style.display = "none";
+              }}
+            />
+            <div className="flex flex-col">
+              <span className="text-sm font-bold text-slate-900">PonProp</span>
+              <span className="text-xs text-slate-500">Property Mgmt</span>
             </div>
           </div>
 
