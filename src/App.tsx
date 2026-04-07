@@ -1,10 +1,14 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend,
+} from "recharts";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "./lib/supabase";
 import { validateProperty, validateTenant, validateLedgerEntry } from "./lib/validation";
 import AuthPage from "./pages/AuthPage";
-import Privacy from "./pages/Privacy";
+import Privacy, { isPrivacyAccepted, markPrivacyAccepted } from "./pages/Privacy";
 
 type ModuleKey =
   | "Home"
@@ -168,10 +172,14 @@ function ComingSoonBanner({ module: mod }: { module: string }) {
   );
 }
 
+const CHART_RED = "#ef4444";
+const CHART_EMERALD = "#22c55e";
+
 function Dashboard() {
   const navigate = useNavigate();
   const [activeModule, setActiveModule] = useState<ModuleKey>("Home");
   const [activeUnimplemented, setActiveUnimplemented] = useState<string | null>(null);
+  const [accountingTab, setAccountingTab] = useState<"charts" | "ledger">("charts");
   const [authUser, setAuthUser] = useState<User | null>(null);
   const [dataLoading, setDataLoading] = useState(false);
 
@@ -254,6 +262,31 @@ function Dashboard() {
     [transactions]
   );
   const netProfit = totalIncome - totalExpenses;
+
+  // Monthly income vs expenses for bar chart (last 12 months with data)
+  const monthlyChartData = useMemo(() => {
+    const map = new Map<string, { month: string; Income: number; Expenses: number }>();
+    transactions.forEach((tx) => {
+      const key = tx.date.substring(0, 7); // YYYY-MM
+      if (!map.has(key)) map.set(key, { month: key, Income: 0, Expenses: 0 });
+      const entry = map.get(key)!;
+      if (tx.type === "Income") entry.Income += Number(tx.amount);
+      else entry.Expenses += Number(tx.amount);
+    });
+    return Array.from(map.values())
+      .sort((a, b) => a.month.localeCompare(b.month))
+      .slice(-12)
+      .map((d) => ({ ...d, month: d.month.substring(2) })); // shorten to YY-MM for display
+  }, [transactions]);
+
+  const pieData = useMemo(() => [
+    { name: "Income", value: totalIncome },
+    { name: "Expenses", value: totalExpenses },
+  ], [totalIncome, totalExpenses]);
+
+  const totalUnits = useMemo(() => properties.reduce((s, p) => s + (p.units || 0), 0), [properties]);
+  const activeTenants = useMemo(() => tenants.filter((t) => t.status === "Active").length, [tenants]);
+  const occupancyRate = totalUnits > 0 ? Math.round((activeTenants / totalUnits) * 100) : 0;
 
   async function addProperty(e: React.FormEvent) {
     e.preventDefault();
@@ -751,145 +784,262 @@ function Dashboard() {
               <>
                 <h1 className="text-3xl font-bold text-slate-900 mb-6">Accounting</h1>
 
-                <div className="grid gap-4 md:grid-cols-3 mb-6">
-                  {[
-                    { label: "Total Income", value: totalIncome, color: "text-emerald-600" },
-                    { label: "Total Expenses", value: totalExpenses, color: "text-rose-600" },
-                    { label: "Net Profit", value: netProfit, color: netProfit >= 0 ? "text-emerald-600" : "text-rose-600" },
-                  ].map(({ label, value, color }) => (
-                    <div key={label} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                      <div className="text-sm text-slate-500 mb-2">{label}</div>
-                      <div className={`text-3xl font-extrabold ${color}`}>${value.toLocaleString()}</div>
-                    </div>
+                {/* Tab switcher */}
+                <div className="flex gap-1 mb-6 bg-slate-100 p-1 rounded-xl w-fit" role="tablist" aria-label="Accounting tabs">
+                  {(["charts", "ledger"] as const).map((tab) => (
+                    <button
+                      key={tab}
+                      role="tab"
+                      aria-selected={accountingTab === tab}
+                      onClick={() => setAccountingTab(tab)}
+                      className={`px-5 py-2 rounded-lg text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-orange-300 capitalize ${
+                        accountingTab === tab
+                          ? "bg-white text-slate-900 shadow-sm"
+                          : "text-slate-500 hover:text-slate-700"
+                      }`}
+                    >
+                      {tab === "charts" ? "Overview" : "Ledger"}
+                    </button>
                   ))}
                 </div>
 
-                <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm mb-6">
-                  <h2 className="text-lg font-semibold text-slate-900 mb-4">Add Transaction</h2>
-                  <form onSubmit={addTransaction} noValidate>
-                    <div className="grid gap-4 mb-4 sm:grid-cols-2 xl:grid-cols-3">
-                      <div>
-                        <label htmlFor="tx-date" className={labelClass}>Date *</label>
-                        <input
-                          id="tx-date"
-                          className={inputClass}
-                          type="date"
-                          value={newTransaction.date}
-                          onChange={(e) => setNewTransaction({ ...newTransaction, date: e.target.value })}
-                          required
-                          aria-required="true"
-                        />
+                {/* TAB 1: Charts / Overview */}
+                {accountingTab === "charts" && (
+                  <>
+                    {/* KPI cards */}
+                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 mb-6">
+                      {[
+                        { label: "Total Income", value: `$${totalIncome.toLocaleString()}`, color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-100" },
+                        { label: "Total Expenses", value: `$${totalExpenses.toLocaleString()}`, color: "text-rose-600", bg: "bg-rose-50", border: "border-rose-100" },
+                        { label: "Net Profit", value: `$${netProfit.toLocaleString()}`, color: netProfit >= 0 ? "text-emerald-600" : "text-rose-600", bg: "bg-white", border: "border-slate-200" },
+                        { label: "Occupancy Rate", value: `${occupancyRate}%`, color: "text-orange-600", bg: "bg-orange-50", border: "border-orange-100" },
+                      ].map(({ label, value, color, bg, border }) => (
+                        <div key={label} className={`rounded-2xl border ${border} ${bg} p-5 shadow-sm`}>
+                          <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">{label}</div>
+                          <div className={`text-2xl font-extrabold ${color}`}>{value}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="grid gap-6 xl:grid-cols-2 mb-6">
+                      {/* Monthly income vs expenses bar chart */}
+                      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                        <h2 className="text-base font-semibold text-slate-900 mb-4">Monthly Income vs Expenses</h2>
+                        {monthlyChartData.length === 0 ? (
+                          <div className="flex items-center justify-center h-48 text-slate-400 text-sm">No transaction data yet.</div>
+                        ) : (
+                          <ResponsiveContainer width="100%" height={220}>
+                            <BarChart data={monthlyChartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                              <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#94a3b8" }} />
+                              <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                              <Tooltip
+                                formatter={(value: number) => [`$${value.toLocaleString()}`, undefined]}
+                                contentStyle={{ borderRadius: "10px", border: "1px solid #e2e8f0", fontSize: 12 }}
+                              />
+                              <Legend wrapperStyle={{ fontSize: 12 }} />
+                              <Bar dataKey="Income" fill={CHART_EMERALD} radius={[4, 4, 0, 0]} />
+                              <Bar dataKey="Expenses" fill={CHART_RED} radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        )}
                       </div>
-                      <div>
-                        <label htmlFor="tx-type" className={labelClass}>Type</label>
-                        <select
-                          id="tx-type"
-                          className={inputClass}
-                          value={newTransaction.type}
-                          onChange={(e) => setNewTransaction({ ...newTransaction, type: e.target.value })}
-                        >
-                          <option value="Income">Income</option>
-                          <option value="Expense">Expense</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label htmlFor="tx-amount" className={labelClass}>Amount ($) *</label>
-                        <input
-                          id="tx-amount"
-                          className={inputClass}
-                          type="number"
-                          min={0}
-                          step="0.01"
-                          placeholder="0.00"
-                          value={newTransaction.amount}
-                          onChange={(e) => setNewTransaction({ ...newTransaction, amount: Number(e.target.value) })}
-                          required
-                          aria-required="true"
-                        />
-                      </div>
-                      <div>
-                        <label htmlFor="tx-tenant" className={labelClass}>Tenant</label>
-                        <input
-                          id="tx-tenant"
-                          className={inputClass}
-                          placeholder="Optional"
-                          value={newTransaction.tenant}
-                          onChange={(e) => setNewTransaction({ ...newTransaction, tenant: e.target.value })}
-                          maxLength={255}
-                        />
-                      </div>
-                      <div>
-                        <label htmlFor="tx-property" className={labelClass}>Property</label>
-                        <input
-                          id="tx-property"
-                          className={inputClass}
-                          placeholder="Optional"
-                          value={newTransaction.property}
-                          onChange={(e) => setNewTransaction({ ...newTransaction, property: e.target.value })}
-                          maxLength={255}
-                        />
-                      </div>
-                      <div>
-                        <label htmlFor="tx-method" className={labelClass}>Payment Method</label>
-                        <input
-                          id="tx-method"
-                          className={inputClass}
-                          placeholder="e.g. Check, ACH"
-                          value={newTransaction.method}
-                          onChange={(e) => setNewTransaction({ ...newTransaction, method: e.target.value })}
-                          maxLength={100}
-                        />
+
+                      {/* Income vs Expenses pie chart */}
+                      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                        <h2 className="text-base font-semibold text-slate-900 mb-4">Income vs Expenses Split</h2>
+                        {totalIncome === 0 && totalExpenses === 0 ? (
+                          <div className="flex items-center justify-center h-48 text-slate-400 text-sm">No transaction data yet.</div>
+                        ) : (
+                          <ResponsiveContainer width="100%" height={220}>
+                            <PieChart>
+                              <Pie
+                                data={pieData}
+                                cx="50%"
+                                cy="50%"
+                                innerRadius={55}
+                                outerRadius={85}
+                                paddingAngle={3}
+                                dataKey="value"
+                                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                                labelLine={false}
+                              >
+                                <Cell fill={CHART_EMERALD} />
+                                <Cell fill={CHART_RED} />
+                              </Pie>
+                              <Tooltip
+                                formatter={(value: number) => [`$${value.toLocaleString()}`, undefined]}
+                                contentStyle={{ borderRadius: "10px", border: "1px solid #e2e8f0", fontSize: 12 }}
+                              />
+                              <Legend wrapperStyle={{ fontSize: 12 }} />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        )}
                       </div>
                     </div>
-                    <FormMessage {...txMsg} />
-                    <button
-                      type="submit"
-                      disabled={txSubmitting}
-                      className="mt-3 px-5 py-2.5 rounded-lg bg-gradient-to-r from-orange-500 to-red-500 text-white text-sm font-semibold hover:shadow-md active:scale-95 transition disabled:opacity-60 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-orange-300"
-                    >
-                      {txSubmitting ? "Saving…" : "Save Entry"}
-                    </button>
-                  </form>
-                </div>
 
-                <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                  <h2 className="text-lg font-semibold text-slate-900 mb-4">Transactions</h2>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm" aria-label="Transactions">
-                      <thead>
-                        <tr className="border-b border-slate-200">
-                          <th scope="col" className="text-left py-3 px-4 font-semibold text-slate-600">Date</th>
-                          <th scope="col" className="text-left py-3 px-4 font-semibold text-slate-600">Type</th>
-                          <th scope="col" className="text-left py-3 px-4 font-semibold text-slate-600">Amount</th>
-                          <th scope="col" className="text-left py-3 px-4 font-semibold text-slate-600">Tenant</th>
-                          <th scope="col" className="text-left py-3 px-4 font-semibold text-slate-600">Property</th>
-                          <th scope="col" className="text-left py-3 px-4 font-semibold text-slate-600">Method</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {transactions.map((tx) => (
-                          <tr key={tx.id} className="border-b border-slate-100 hover:bg-slate-50 transition">
-                            <td className="py-3 px-4 text-slate-700">{tx.date}</td>
-                            <td className="py-3 px-4">
-                              <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${tx.type === "Income" ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"}`}>
-                                {tx.type}
-                              </span>
-                            </td>
-                            <td className={`py-3 px-4 text-sm font-semibold ${tx.type === "Income" ? "text-emerald-600" : "text-rose-600"}`}>
-                              ${Number(tx.amount).toLocaleString()}
-                            </td>
-                            <td className="py-3 px-4 text-slate-600">{tx.tenant || "—"}</td>
-                            <td className="py-3 px-4 text-slate-600">{tx.property || "—"}</td>
-                            <td className="py-3 px-4 text-slate-600">{tx.method || "—"}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    {!dataLoading && transactions.length === 0 && (
-                      <p className="text-center py-12 text-slate-400 text-sm">No transactions yet. Add your first entry above.</p>
-                    )}
-                  </div>
-                </div>
+                    {/* Occupancy summary */}
+                    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                      <h2 className="text-base font-semibold text-slate-900 mb-4">Occupancy Overview</h2>
+                      <div className="flex flex-col sm:flex-row gap-6 items-start sm:items-center">
+                        <div className="flex-1">
+                          <div className="flex justify-between text-sm mb-2">
+                            <span className="text-slate-600">Occupied units</span>
+                            <span className="font-semibold text-slate-900">{activeTenants} / {totalUnits}</span>
+                          </div>
+                          <div className="w-full bg-slate-100 rounded-full h-3">
+                            <div
+                              className="h-3 rounded-full transition-all duration-500"
+                              style={{
+                                width: `${occupancyRate}%`,
+                                background: "linear-gradient(90deg, #f97316, #ef4444)",
+                              }}
+                              role="progressbar"
+                              aria-valuenow={occupancyRate}
+                              aria-valuemin={0}
+                              aria-valuemax={100}
+                              aria-label={`Occupancy rate ${occupancyRate}%`}
+                            />
+                          </div>
+                          <div className="text-xs text-slate-400 mt-1">{occupancyRate}% occupancy rate</div>
+                        </div>
+                        <div className="text-4xl font-extrabold text-orange-500">{occupancyRate}%</div>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* TAB 2: Ledger */}
+                {accountingTab === "ledger" && (
+                  <>
+                    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm mb-6">
+                      <h2 className="text-lg font-semibold text-slate-900 mb-4">Add Transaction</h2>
+                      <form onSubmit={addTransaction} noValidate>
+                        <div className="grid gap-4 mb-4 sm:grid-cols-2 xl:grid-cols-3">
+                          <div>
+                            <label htmlFor="tx-date" className={labelClass}>Date *</label>
+                            <input
+                              id="tx-date"
+                              className={inputClass}
+                              type="date"
+                              value={newTransaction.date}
+                              onChange={(e) => setNewTransaction({ ...newTransaction, date: e.target.value })}
+                              required
+                              aria-required="true"
+                            />
+                          </div>
+                          <div>
+                            <label htmlFor="tx-type" className={labelClass}>Type</label>
+                            <select
+                              id="tx-type"
+                              className={inputClass}
+                              value={newTransaction.type}
+                              onChange={(e) => setNewTransaction({ ...newTransaction, type: e.target.value })}
+                            >
+                              <option value="Income">Income</option>
+                              <option value="Expense">Expense</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label htmlFor="tx-amount" className={labelClass}>Amount ($) *</label>
+                            <input
+                              id="tx-amount"
+                              className={inputClass}
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              placeholder="0.00"
+                              value={newTransaction.amount}
+                              onChange={(e) => setNewTransaction({ ...newTransaction, amount: Number(e.target.value) })}
+                              required
+                              aria-required="true"
+                            />
+                          </div>
+                          <div>
+                            <label htmlFor="tx-tenant" className={labelClass}>Tenant</label>
+                            <input
+                              id="tx-tenant"
+                              className={inputClass}
+                              placeholder="Optional"
+                              value={newTransaction.tenant}
+                              onChange={(e) => setNewTransaction({ ...newTransaction, tenant: e.target.value })}
+                              maxLength={255}
+                            />
+                          </div>
+                          <div>
+                            <label htmlFor="tx-property" className={labelClass}>Property</label>
+                            <input
+                              id="tx-property"
+                              className={inputClass}
+                              placeholder="Optional"
+                              value={newTransaction.property}
+                              onChange={(e) => setNewTransaction({ ...newTransaction, property: e.target.value })}
+                              maxLength={255}
+                            />
+                          </div>
+                          <div>
+                            <label htmlFor="tx-method" className={labelClass}>Payment Method</label>
+                            <input
+                              id="tx-method"
+                              className={inputClass}
+                              placeholder="e.g. Check, ACH"
+                              value={newTransaction.method}
+                              onChange={(e) => setNewTransaction({ ...newTransaction, method: e.target.value })}
+                              maxLength={100}
+                            />
+                          </div>
+                        </div>
+                        <FormMessage {...txMsg} />
+                        <button
+                          type="submit"
+                          disabled={txSubmitting}
+                          className="mt-3 px-5 py-2.5 rounded-lg bg-gradient-to-r from-orange-500 to-red-500 text-white text-sm font-semibold hover:shadow-md active:scale-95 transition disabled:opacity-60 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-orange-300"
+                        >
+                          {txSubmitting ? "Saving…" : "Save Entry"}
+                        </button>
+                      </form>
+                    </div>
+
+                    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                      <h2 className="text-lg font-semibold text-slate-900 mb-4">Transactions</h2>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm" aria-label="Transactions">
+                          <thead>
+                            <tr className="border-b border-slate-200">
+                              <th scope="col" className="text-left py-3 px-4 font-semibold text-slate-600">Date</th>
+                              <th scope="col" className="text-left py-3 px-4 font-semibold text-slate-600">Type</th>
+                              <th scope="col" className="text-left py-3 px-4 font-semibold text-slate-600">Amount</th>
+                              <th scope="col" className="text-left py-3 px-4 font-semibold text-slate-600">Tenant</th>
+                              <th scope="col" className="text-left py-3 px-4 font-semibold text-slate-600">Property</th>
+                              <th scope="col" className="text-left py-3 px-4 font-semibold text-slate-600">Method</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {transactions.map((tx) => (
+                              <tr key={tx.id} className="border-b border-slate-100 hover:bg-slate-50 transition">
+                                <td className="py-3 px-4 text-slate-700">{tx.date}</td>
+                                <td className="py-3 px-4">
+                                  <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${tx.type === "Income" ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"}`}>
+                                    {tx.type}
+                                  </span>
+                                </td>
+                                <td className={`py-3 px-4 text-sm font-semibold ${tx.type === "Income" ? "text-emerald-600" : "text-rose-600"}`}>
+                                  ${Number(tx.amount).toLocaleString()}
+                                </td>
+                                <td className="py-3 px-4 text-slate-600">{tx.tenant || "—"}</td>
+                                <td className="py-3 px-4 text-slate-600">{tx.property || "—"}</td>
+                                <td className="py-3 px-4 text-slate-600">{tx.method || "—"}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        {!dataLoading && transactions.length === 0 && (
+                          <p className="text-center py-12 text-slate-400 text-sm">No transactions yet. Add your first entry above.</p>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
               </>
             )}
 
@@ -947,14 +1097,33 @@ function getSidebarIcon(item: string) {
   }
 }
 
+function PrivacyGate({ children }: { children: React.ReactNode }) {
+  const [accepted, setAccepted] = useState(() => isPrivacyAccepted());
+
+  if (!accepted) {
+    return (
+      <Privacy
+        asGate
+        onAccept={() => {
+          markPrivacyAccepted();
+          setAccepted(true);
+        }}
+      />
+    );
+  }
+  return <>{children}</>;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<AuthPage />} />
-        <Route path="/home" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-        <Route path="/privacy" element={<Privacy />} />
-      </Routes>
+      <PrivacyGate>
+        <Routes>
+          <Route path="/" element={<AuthPage />} />
+          <Route path="/home" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/privacy" element={<Privacy />} />
+        </Routes>
+      </PrivacyGate>
     </BrowserRouter>
   );
 }
