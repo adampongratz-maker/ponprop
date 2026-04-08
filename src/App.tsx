@@ -81,26 +81,28 @@ const IMPLEMENTED_MODULES: ModuleKey[] = [
   "Marketing", "Legal", "Finance", "Calendar", "Complaints", "Analytics", "IT",
 ];
 
+// Top-level sidebar items in the requested order.
+// "Time Cards", "To Do", and "Calendar" are nested under the Employee group.
 const sidebarItems = [
   "Home",
-  "To Do",
-  "History",
-  "Tenants",
-  "Maintenance",
-  "Inventory",
-  "Time Cards",
-  "Reports",
   "Accounting",
-  "Properties",
-  "Projects",
+  "Maintenance",
   "Marketing",
+  // Employee group items rendered separately below
+  "Properties",
+  "Tenants",
+  "History",
+  "Inventory",
+  "Reports",
+  "Projects",
   "Legal",
   "Finance",
-  "Calendar",
   "Complaints",
   "Analytics",
   "IT",
 ];
+
+const employeeItems = ["Time Cards", "To Do", "Calendar"] as const;
 
 const appItems = [
   { name: "Home", icon: "⌂", color: "linear-gradient(135deg, #ff8a5b, #f05a4f)" },
@@ -210,6 +212,7 @@ function Dashboard() {
   const navigate = useNavigate();
   const [activeModule, setActiveModule] = useState<ModuleKey>("Home");
   const [accountingTab, setAccountingTab] = useState<"charts" | "ledger">("charts");
+  const [employeeOpen, setEmployeeOpen] = useState(false);
   const [authUser, setAuthUser] = useState<User | null>(null);
   const [dataLoading, setDataLoading] = useState(false);
 
@@ -421,6 +424,11 @@ function Dashboard() {
 
   function handleSidebarClick(item: string) {
     setActiveModule(item as ModuleKey);
+    // Auto-expand the Employee group when one of its items is activated
+    // (e.g. clicked from the home grid or elsewhere outside the sidebar group)
+    if ((employeeItems as readonly string[]).includes(item)) {
+      setEmployeeOpen(true);
+    }
   }
 
   const activeSidebarItem = activeModule;
@@ -454,8 +462,80 @@ function Dashboard() {
             </div>
           </div>
 
-          <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-0.5">
-            {sidebarItems.map((item) => {
+          <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-0.5" aria-label="Main navigation">
+            {sidebarItems.slice(0, 4).map((item) => {
+              // Render Home, Accounting, Maintenance, Marketing first
+              const isActive = item === activeSidebarItem;
+              return (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => handleSidebarClick(item)}
+                  aria-current={isActive ? "page" : undefined}
+                  className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-medium transition duration-200 ${
+                    isActive
+                      ? "bg-gradient-to-r from-orange-100 to-red-100 text-orange-700 shadow-sm"
+                      : "text-slate-600 hover:bg-slate-100"
+                  }`}
+                >
+                  <span style={{ width: "16px", textAlign: "center", fontSize: "16px" }} aria-hidden="true">
+                    {getSidebarIcon(item)}
+                  </span>
+                  <span className="flex-1">{item}</span>
+                  {isActive && <span className="text-orange-500" aria-hidden="true">●</span>}
+                </button>
+              );
+            })}
+
+            {/* ── Employee collapsible group ── */}
+            <div>
+              <button
+                type="button"
+                onClick={() => setEmployeeOpen(o => !o)}
+                aria-expanded={employeeOpen}
+                className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-medium transition duration-200 ${
+                  employeeItems.includes(activeSidebarItem as any)
+                    ? "bg-gradient-to-r from-orange-100 to-red-100 text-orange-700 shadow-sm"
+                    : "text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                <span style={{ width: "16px", textAlign: "center", fontSize: "16px" }} aria-hidden="true">👤</span>
+                <span className="flex-1">Employee</span>
+                <span className="text-slate-400 text-xs" aria-hidden="true">
+                  {employeeOpen ? "▾" : "▸"}
+                </span>
+              </button>
+
+              {employeeOpen && (
+                <div className="ml-4 mt-0.5 space-y-0.5 border-l-2 border-orange-100 pl-2">
+                  {employeeItems.map((item) => {
+                    const isActive = item === activeSidebarItem;
+                    return (
+                      <button
+                        key={item}
+                        type="button"
+                        onClick={() => { handleSidebarClick(item); }}
+                        aria-current={isActive ? "page" : undefined}
+                        className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-xs font-medium transition duration-200 ${
+                          isActive
+                            ? "bg-gradient-to-r from-orange-100 to-red-100 text-orange-700 shadow-sm"
+                            : "text-slate-600 hover:bg-slate-100"
+                        }`}
+                      >
+                        <span style={{ width: "16px", textAlign: "center", fontSize: "16px" }} aria-hidden="true">
+                          {getSidebarIcon(item)}
+                        </span>
+                        <span className="flex-1">{item}</span>
+                        {isActive && <span className="text-orange-500" aria-hidden="true">●</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* ── Remaining items: Properties → IT ── */}
+            {sidebarItems.slice(4).map((item) => {
               const isActive = item === activeSidebarItem;
               return (
                 <button
