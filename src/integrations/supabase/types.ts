@@ -212,6 +212,48 @@ export type Database = {
         }
         Relationships: []
       }
+      todos: {
+        Row: {
+          id: string
+          user_id: string
+          title: string
+          description: string | null
+          priority: string
+          status: string
+          due_date: string | null
+          property_id: string | null
+          category: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          title: string
+          description?: string | null
+          priority?: string
+          status?: string
+          due_date?: string | null
+          property_id?: string | null
+          category?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          title?: string
+          description?: string | null
+          priority?: string
+          status?: string
+          due_date?: string | null
+          property_id?: string | null
+          category?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       tenants: {
         Row: {
           balance: number | null

@@ -27,6 +27,9 @@ export const ALLOWED_VALUES = {
   TASK_PRIORITY: ["Low", "Medium", "High"],
   TASK_STATUS: ["Open", "Completed", "Cancelled"],
   WORK_ORDER_STATUS: ["Open", "In Progress", "Completed"],
+  TODO_PRIORITY: ["low", "medium", "high"],
+  TODO_STATUS: ["pending", "in_progress", "completed"],
+  TODO_CATEGORY: ["maintenance", "tenant", "financial", "legal", "general"],
 };
 
 /**
@@ -210,6 +213,19 @@ export function validateWorkOrder(data: any) {
     status: validateEnumValue(data.status, ALLOWED_VALUES.WORK_ORDER_STATUS, "Status"),
     priority: validateEnumValue(data.priority, ALLOWED_VALUES.TASK_PRIORITY, "Priority"),
   };
+}
+
+/**
+ * Validates todo data (todos table)
+ */
+export function validateTodo(data: any) {
+  const title = sanitizeName(data.title, "Title");
+  const priority = validateEnumValue(data.priority, ALLOWED_VALUES.TODO_PRIORITY, "Priority");
+  const status = validateEnumValue(data.status, ALLOWED_VALUES.TODO_STATUS, "Status");
+  const description = data.description ? sanitizeString(data.description, VALIDATION_LIMITS.DESCRIPTION_MAX) || null : null;
+  const category = data.category ? validateEnumValue(data.category, ALLOWED_VALUES.TODO_CATEGORY, "Category") : null;
+  const due_date = data.due_date ? sanitizeDate(data.due_date) : null;
+  return { title, priority, status, description, category, due_date };
 }
 
 /**
