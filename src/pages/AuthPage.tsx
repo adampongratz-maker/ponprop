@@ -273,14 +273,18 @@ export default function AuthPage() {
           </form>
         </div>
 
-        <div className="mt-8 text-center">
-          <p className="text-sm text-slate-600">
+        <div className="mt-6 text-center space-y-2">
+          <p className="text-xs text-slate-400">
+            By signing in you agree to our{" "}
             <a
               href="/privacy"
-              className="text-sky-600 hover:text-sky-700 font-medium transition cursor-pointer"
+              className="text-orange-500 hover:text-orange-600 font-medium underline underline-offset-2 transition focus:outline-none focus:ring-1 focus:ring-orange-300 rounded"
             >
               Privacy Policy
             </a>
+          </p>
+          <p className="text-xs text-slate-400">
+            Pongratz Properties &copy; {new Date().getFullYear()}
           </p>
         </div>
       </div>

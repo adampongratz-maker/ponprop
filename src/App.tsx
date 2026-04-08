@@ -10,12 +10,40 @@ import { validateProperty, validateTenant, validateLedgerEntry } from "./lib/val
 import AuthPage from "./pages/AuthPage";
 import Privacy, { isPrivacyAccepted, markPrivacyAccepted } from "./pages/Privacy";
 
+// Module page components
+import ToDoPage from "./pages/ToDo";
+import RentalHistoryPage from "./pages/RentalHistory";
+import MaintenancePage from "./pages/Maintenance";
+import InventoryPage from "./pages/Inventory";
+import TimeCardsPage from "./pages/TimeCards";
+import ProjectsPage from "./pages/Projects";
+import MarketingPage from "./pages/Marketing";
+import LegalPage from "./pages/Legal";
+import FinancePage from "./pages/Finance";
+import CalendarPage from "./pages/Calendar";
+import ComplaintsPage from "./pages/Complaints";
+import AnalyticsPage from "./pages/Analytics";
+import ITPage from "./pages/IT";
+
 type ModuleKey =
   | "Home"
-  | "Properties"
+  | "To Do"
+  | "History"
   | "Tenants"
+  | "Maintenance"
+  | "Inventory"
+  | "Time Cards"
+  | "Reports"
   | "Accounting"
-  | "Reports";
+  | "Properties"
+  | "Projects"
+  | "Marketing"
+  | "Legal"
+  | "Finance"
+  | "Calendar"
+  | "Complaints"
+  | "Analytics"
+  | "IT";
 
 type PropertyRow = {
   id: string;
@@ -45,12 +73,11 @@ type LedgerRow = {
   user_id: string;
 };
 
+// All modules are now implemented — no coming soon placeholders
 const IMPLEMENTED_MODULES: ModuleKey[] = [
-  "Home",
-  "Properties",
-  "Tenants",
-  "Accounting",
-  "Reports",
+  "Home", "To Do", "History", "Tenants", "Maintenance", "Inventory",
+  "Time Cards", "Reports", "Accounting", "Properties", "Projects",
+  "Marketing", "Legal", "Finance", "Calendar", "Complaints", "Analytics", "IT",
 ];
 
 const sidebarItems = [
@@ -162,15 +189,6 @@ function FormMessage({ error, success }: { error?: string; success?: string }) {
   return null;
 }
 
-function ComingSoonBanner({ module: mod }: { module: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-24 text-center">
-      <div className="text-5xl mb-4" aria-hidden="true">🚧</div>
-      <h2 className="text-2xl font-bold text-slate-900 mb-2">{mod}</h2>
-      <p className="text-slate-500 max-w-xs">This module is coming soon. Check back for updates.</p>
-    </div>
-  );
-}
 
 const CHART_RED = "#ef4444";
 const CHART_EMERALD = "#22c55e";
@@ -178,7 +196,6 @@ const CHART_EMERALD = "#22c55e";
 function Dashboard() {
   const navigate = useNavigate();
   const [activeModule, setActiveModule] = useState<ModuleKey>("Home");
-  const [activeUnimplemented, setActiveUnimplemented] = useState<string | null>(null);
   const [accountingTab, setAccountingTab] = useState<"charts" | "ledger">("charts");
   const [authUser, setAuthUser] = useState<User | null>(null);
   const [dataLoading, setDataLoading] = useState(false);
@@ -390,17 +407,10 @@ function Dashboard() {
   }
 
   function handleSidebarClick(item: string) {
-    if (IMPLEMENTED_MODULES.includes(item as ModuleKey)) {
-      setActiveModule(item as ModuleKey);
-      setActiveUnimplemented(null);
-    } else {
-      setActiveUnimplemented(item);
-      setActiveModule("Home"); // reset so module panels hide
-    }
+    setActiveModule(item as ModuleKey);
   }
 
-  // Determine what label to show as "active" in sidebar
-  const activeSidebarItem = activeUnimplemented ?? activeModule;
+  const activeSidebarItem = activeModule;
 
   const inputClass = "w-full px-3 py-2.5 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition disabled:opacity-50";
   const labelClass = "block text-xs font-semibold text-slate-600 mb-1";
@@ -434,7 +444,6 @@ function Dashboard() {
           <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-0.5">
             {sidebarItems.map((item) => {
               const isActive = item === activeSidebarItem;
-              const isImplemented = IMPLEMENTED_MODULES.includes(item as ModuleKey);
               return (
                 <button
                   key={item}
@@ -444,9 +453,7 @@ function Dashboard() {
                   className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-medium transition duration-200 ${
                     isActive
                       ? "bg-gradient-to-r from-orange-100 to-red-100 text-orange-700 shadow-sm"
-                      : isImplemented
-                        ? "text-slate-600 hover:bg-slate-100"
-                        : "text-slate-400 hover:bg-slate-50"
+                      : "text-slate-600 hover:bg-slate-100"
                   }`}
                 >
                   <span style={{ width: "16px", textAlign: "center", fontSize: "16px" }} aria-hidden="true">
@@ -454,9 +461,6 @@ function Dashboard() {
                   </span>
                   <span className="flex-1">{item}</span>
                   {isActive && <span className="text-orange-500" aria-hidden="true">●</span>}
-                  {!isImplemented && !isActive && (
-                    <span className="text-[9px] text-slate-300 font-normal">soon</span>
-                  )}
                 </button>
               );
             })}
@@ -506,11 +510,8 @@ function Dashboard() {
               </div>
             )}
 
-            {/* Coming soon panel for unimplemented modules */}
-            {activeUnimplemented && <ComingSoonBanner module={activeUnimplemented} />}
-
             {/* HOME */}
-            {!activeUnimplemented && activeModule === "Home" && (
+            {activeModule === "Home" && (
               <>
                 <div className="mb-8">
                   <h1 className="text-4xl font-bold tracking-tight text-slate-900">Welcome back 👋</h1>
@@ -518,51 +519,44 @@ function Dashboard() {
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                  {appItems.map((item) => {
-                    const isImplemented = IMPLEMENTED_MODULES.includes(item.name as ModuleKey);
-                    return (
-                      <button
-                        key={item.name}
-                        type="button"
-                        onClick={() => handleSidebarClick(item.name)}
-                        aria-label={`Open ${item.name} module${!isImplemented ? " (coming soon)" : ""}`}
-                        className="group rounded-2xl border border-slate-200 bg-white min-h-[140px] p-5 text-left transition duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-orange-300"
+                  {appItems.map((item) => (
+                    <button
+                      key={item.name}
+                      type="button"
+                      onClick={() => handleSidebarClick(item.name)}
+                      aria-label={`Open ${item.name} module`}
+                      className="group rounded-2xl border border-slate-200 bg-white min-h-[140px] p-5 text-left transition duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-orange-300"
+                    >
+                      <div
+                        style={{
+                          width: "56px",
+                          height: "56px",
+                          borderRadius: "14px",
+                          background: item.color,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          color: "#ffffff",
+                          fontSize: "28px",
+                          fontWeight: 700,
+                          marginBottom: "10px",
+                          boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                        }}
+                        aria-hidden="true"
                       >
-                        <div
-                          style={{
-                            width: "56px",
-                            height: "56px",
-                            borderRadius: "14px",
-                            background: item.color,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            color: "#ffffff",
-                            fontSize: "28px",
-                            fontWeight: 700,
-                            marginBottom: "10px",
-                            boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                            opacity: isImplemented ? 1 : 0.7,
-                          }}
-                          aria-hidden="true"
-                        >
-                          {item.icon}
-                        </div>
-                        <div className="text-sm font-semibold text-slate-900 group-hover:text-slate-700">
-                          {item.name}
-                        </div>
-                        {!isImplemented && (
-                          <div className="text-xs text-slate-400 mt-0.5">Coming soon</div>
-                        )}
-                      </button>
-                    );
-                  })}
+                        {item.icon}
+                      </div>
+                      <div className="text-sm font-semibold text-slate-900 group-hover:text-slate-700">
+                        {item.name}
+                      </div>
+                    </button>
+                  ))}
                 </div>
               </>
             )}
 
             {/* PROPERTIES */}
-            {!activeUnimplemented && activeModule === "Properties" && (
+            {activeModule === "Properties" && (
               <>
                 <h1 className="text-3xl font-bold text-slate-900 mb-6 flex items-center gap-3">
                   <span aria-hidden="true">▤</span> Properties
@@ -674,7 +668,7 @@ function Dashboard() {
             )}
 
             {/* TENANTS */}
-            {!activeUnimplemented && activeModule === "Tenants" && (
+            {activeModule === "Tenants" && (
               <>
                 <h1 className="text-3xl font-bold text-slate-900 mb-6">Tenants</h1>
 
@@ -780,7 +774,7 @@ function Dashboard() {
             )}
 
             {/* ACCOUNTING */}
-            {!activeUnimplemented && activeModule === "Accounting" && (
+            {activeModule === "Accounting" && (
               <>
                 <h1 className="text-3xl font-bold text-slate-900 mb-6">Accounting</h1>
 
@@ -1044,7 +1038,7 @@ function Dashboard() {
             )}
 
             {/* REPORTS */}
-            {!activeUnimplemented && activeModule === "Reports" && (
+            {activeModule === "Reports" && (
               <>
                 <h1 className="text-3xl font-bold text-slate-900 mb-6">Reports</h1>
                 <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm max-w-lg">
@@ -1066,6 +1060,21 @@ function Dashboard() {
                 </div>
               </>
             )}
+
+            {/* ── Delegated module pages ─────────────────────────────────── */}
+            {activeModule === "To Do" && <ToDoPage />}
+            {activeModule === "History" && <RentalHistoryPage />}
+            {activeModule === "Maintenance" && <MaintenancePage />}
+            {activeModule === "Inventory" && <InventoryPage />}
+            {activeModule === "Time Cards" && <TimeCardsPage />}
+            {activeModule === "Projects" && <ProjectsPage />}
+            {activeModule === "Marketing" && <MarketingPage />}
+            {activeModule === "Legal" && <LegalPage />}
+            {activeModule === "Finance" && <FinancePage />}
+            {activeModule === "Calendar" && <CalendarPage />}
+            {activeModule === "Complaints" && <ComplaintsPage />}
+            {activeModule === "Analytics" && <AnalyticsPage />}
+            {activeModule === "IT" && <ITPage />}
           </div>
         </main>
       </div>
