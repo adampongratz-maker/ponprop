@@ -12,20 +12,17 @@ export default function AuthPage() {
   const [sessionCheckLoading, setSessionCheckLoading] = useState(true);
 
   useEffect(() => {
-    const checkSession = async () => {
-      try {
-        const { data } = await supabase.auth.getSession();
-        if (data?.session) {
-          navigate("/home");
-        }
-      } catch (err) {
-        console.error("Error checking session:", err);
-      } finally {
+    // Use onAuthStateChange instead of getSession() so we correctly catch
+    // the SIGNED_IN event that fires after Supabase processes an OAuth
+    // callback hash (#access_token=…) in the URL.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        navigate("/home");
+      } else {
         setSessionCheckLoading(false);
       }
-    };
-
-    checkSession();
+    });
+    return () => subscription.unsubscribe();
   }, [navigate]);
 
   const validate = () => {
@@ -136,7 +133,9 @@ export default function AuthPage() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/home`,
+        // Redirect to origin (AuthPage at "/") so the OAuth hash is processed
+        // there — not at "/home" where ProtectedRoute could strip it prematurely.
+        redirectTo: window.location.origin,
       },
     });
     if (error) {

@@ -141,9 +141,12 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null | undefined>(undefined);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-    });
+    // Do NOT call getSession() here. It resolves before Supabase has had a
+    // chance to parse an OAuth callback hash (#access_token=…) from the URL,
+    // which causes an immediate null → redirect to "/" that strips the hash.
+    //
+    // onAuthStateChange fires AFTER the hash is processed, so it correctly
+    // receives the SIGNED_IN event from an OAuth redirect.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
     });
