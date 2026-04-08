@@ -7,7 +7,11 @@ export default function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
+  // Pre-fill error from ?auth_error= param written by AuthCallback on exchange failure
+  const [errorMsg, setErrorMsg] = useState(() => {
+    const raw = new URLSearchParams(window.location.search).get("auth_error");
+    return raw ? `Google sign-in failed: ${decodeURIComponent(raw)}` : "";
+  });
   const [successMsg, setSuccessMsg] = useState("");
   const [sessionCheckLoading, setSessionCheckLoading] = useState(true);
 
