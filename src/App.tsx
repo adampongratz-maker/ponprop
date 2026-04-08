@@ -8,6 +8,7 @@ import type { User } from "@supabase/supabase-js";
 import { supabase } from "./lib/supabase";
 import { validateProperty, validateTenant, validateLedgerEntry } from "./lib/validation";
 import AuthPage from "./pages/AuthPage";
+import AuthCallback from "./pages/AuthCallback";
 import Privacy, { isPrivacyAccepted, markPrivacyAccepted } from "./pages/Privacy";
 
 // Module page components
@@ -1129,13 +1130,22 @@ function PrivacyGate({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <BrowserRouter>
-      <PrivacyGate>
-        <Routes>
-          <Route path="/" element={<AuthPage />} />
-          <Route path="/home" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/privacy" element={<Privacy />} />
-        </Routes>
-      </PrivacyGate>
+      <Routes>
+        {/* /auth/callback must be OUTSIDE PrivacyGate — it handles the
+            OAuth PKCE code exchange and must never be blocked by any gate */}
+        <Route path="/auth/callback" element={<AuthCallback />} />
+
+        {/* All other routes are wrapped in the privacy acceptance gate */}
+        <Route path="/*" element={
+          <PrivacyGate>
+            <Routes>
+              <Route path="/" element={<AuthPage />} />
+              <Route path="/home" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+              <Route path="/privacy" element={<Privacy />} />
+            </Routes>
+          </PrivacyGate>
+        } />
+      </Routes>
     </BrowserRouter>
   );
 }

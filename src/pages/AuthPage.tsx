@@ -12,15 +12,18 @@ export default function AuthPage() {
   const [sessionCheckLoading, setSessionCheckLoading] = useState(true);
 
   useEffect(() => {
-    // Use onAuthStateChange instead of getSession() so we correctly catch
-    // the SIGNED_IN event that fires after Supabase processes an OAuth
-    // callback hash (#access_token=…) in the URL.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    // Fast path: already have a session in storage → go straight to /home.
+    // onAuthStateChange catches anything that arrives later (e.g. token refresh).
+    supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         navigate("/home");
       } else {
         setSessionCheckLoading(false);
       }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) navigate("/home");
     });
     return () => subscription.unsubscribe();
   }, [navigate]);
@@ -133,9 +136,10 @@ export default function AuthPage() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        // Redirect to origin (AuthPage at "/") so the OAuth hash is processed
-        // there — not at "/home" where ProtectedRoute could strip it prematurely.
-        redirectTo: window.location.origin,
+        // Dedicated callback route that handles PKCE code exchange explicitly.
+        // Must NOT be "/" or "/home" — PrivacyGate or ProtectedRoute would
+        // block the page before Supabase can exchange the code.
+        redirectTo: `${window.location.origin}/auth/callback`,
       },
     });
     if (error) {
