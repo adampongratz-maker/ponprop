@@ -20,5 +20,12 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_KEY, {
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
+    // Explicitly enable PKCE flow and URL session detection so Supabase
+    // automatically exchanges the ?code= param on the /auth/callback page.
+    // AuthCallback must NOT call exchangeCodeForSession() manually — doing
+    // so double-exchanges the code, the second call fails, and the user
+    // lands back on the login page.
+    detectSessionInUrl: true,
+    flowType: 'pkce',
   },
 });

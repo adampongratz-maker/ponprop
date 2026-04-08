@@ -1,58 +1,57 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 
 /**
- * Handles the OAuth PKCE callback.
+ * OAuth PKCE callback handler.
  *
- * Supabase v2 uses PKCE flow by default — Google redirects back with a
- * `?code=` query param (not a hash). This page exchanges that code for a
- * real session and then sends the user to /home.
+ * DO NOT call supabase.auth.exchangeCodeForSession() here manually.
+ * The Supabase client is configured with detectSessionInUrl: true and
+ * flowType: 'pkce', which means it automatically exchanges the ?code=
+ * parameter during client initialization. Calling exchangeCodeForSession()
+ * a second time would consume an already-used code and fail, sending the
+ * user back to the login page.
  *
- * It must be mounted OUTSIDE PrivacyGate and ProtectedRoute so nothing
- * can interfere with the exchange before it completes.
+ * This component simply waits for onAuthStateChange to confirm the session
+ * and then navigates to /home.
  */
 export default function AuthCallback() {
   const navigate = useNavigate();
-  const exchanged = useRef(false);
 
   useEffect(() => {
-    // Guard against React 18 double-invoke in dev
-    if (exchanged.current) return;
-    exchanged.current = true;
+    console.log("[AuthCallback] mounted — waiting for Supabase to process OAuth callback");
 
-    async function handleCallback() {
-      const params = new URLSearchParams(window.location.search);
-      const code = params.get("code");
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log("[AuthCallback] auth event:", event, "| user:", session?.user?.email ?? null);
 
-      if (code) {
-        // PKCE flow: exchange the authorization code for a session
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
-        if (error) {
-          console.error("OAuth code exchange failed:", error.message);
-          navigate("/?auth_error=" + encodeURIComponent(error.message), { replace: true });
-          return;
-        }
-      } else {
-        // Implicit flow fallback: Supabase detects #access_token hash automatically.
-        // Just wait for onAuthStateChange to fire SIGNED_IN.
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-          if (event === "SIGNED_IN" && session) {
-            subscription.unsubscribe();
-            navigate("/home", { replace: true });
-          } else if (event === "INITIAL_SESSION" && !session) {
-            // No code, no hash session — something went wrong
-            subscription.unsubscribe();
-            navigate("/", { replace: true });
-          }
-        });
+      if (session?.user) {
+        // Session confirmed — either from auto PKCE exchange (SIGNED_IN)
+        // or already present in storage (INITIAL_SESSION)
+        console.log("[AuthCallback] session confirmed, navigating to /home");
+        subscription.unsubscribe();
+        navigate("/home", { replace: true });
         return;
       }
 
-      navigate("/home", { replace: true });
-    }
+      if (event === "INITIAL_SESSION" && !session) {
+        // Supabase hasn't finished the PKCE exchange yet — stay on the
+        // spinner and wait for the SIGNED_IN event.
+        console.log("[AuthCallback] INITIAL_SESSION null — waiting for SIGNED_IN...");
+      }
+    });
 
-    handleCallback();
+    // Safety net: if SIGNED_IN never fires after 15 s, something went wrong
+    // (e.g. redirect URL not in Supabase allowlist → exchange rejected).
+    const timeout = setTimeout(() => {
+      console.error("[AuthCallback] timed out waiting for session — check Supabase Redirect URL allowlist");
+      subscription.unsubscribe();
+      navigate("/?auth_error=" + encodeURIComponent("Sign-in timed out. The redirect URL may not be allowed in your Supabase project settings."), { replace: true });
+    }, 15000);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
   }, [navigate]);
 
   return (

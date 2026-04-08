@@ -151,11 +151,13 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     // Supabase's in-memory cache syncs from localStorage, delivering a null
     // session → setUser(null) → premature redirect to "/".
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log("[ProtectedRoute] getSession →", session?.user?.email ?? null);
       setUser(session?.user ?? null);
     });
 
     // Keep the listener for ongoing changes: sign-out, token refresh, etc.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log("[ProtectedRoute] onAuthStateChange →", event, session?.user?.email ?? null);
       setUser(session?.user ?? null);
     });
     return () => subscription.unsubscribe();
